@@ -1,14 +1,33 @@
-# Attributtify
+# Attributtify — Rule-Based Combination Builder for PrestaShop 8
 
-**Rule-based combination builder for PrestaShop 8.x**
+![Version](https://img.shields.io/badge/version-1.4.0-blue)
+![PrestaShop](https://img.shields.io/badge/PrestaShop-8.0%2B-purple)
+![PHP](https://img.shields.io/badge/PHP-7.4%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-Attributtify replaces the default cartesian combination generator with a rule engine. Instead of generating every possible attribute combination and manually editing prices, you define pricing rules with conditions — and the module generates exactly the combinations you need with the correct prices.
+**Attributtify** replaces PrestaShop's default cartesian combination generator with a rule-based pricing engine. Instead of generating every attribute combination and editing prices row by row, you define pricing rules with conditions — the module generates exactly the combinations you need with correct prices applied automatically.
+
+Built for PrestaShop 8.x products with complex combination pricing: configurable pricing per attribute group, fixed prices, percentage impacts, condition-based exclusions — without manually touching 100+ combination rows.
+
+---
+
+## Features
+
+- **Rule engine** — define conditions (attribute group → values) instead of editing each combination by hand
+- **Fixed prices** — most-specific matching rule sets the exact combination price automatically
+- **Impact pricing** — add fixed dollar or percentage amounts on top of a base price; all matching impact rules are summed
+- **Condition groups** — AND-chains with multiple OR blocks; fine-grained control over which combinations get which price
+- **Excludes & Applies-to** — restrict or skip combinations by attribute value
+- **Preview before generating** — inspect the full combination list before writing to the database
+- **Anti-amplification guard** — prevents the same impact rule from applying more than once to a combination
+- **Custom reference patterns** — `{product_ref}`, `{attrs}`, `{n}` tokens for auto-generated SKUs
+- **Zero configuration** — the panel appears automatically inside the Combinations tab on every product page
 
 ---
 
 ## The problem it solves
 
-Standard PrestaShop combination generation is cartesian: pick all attribute groups, generate all combinations, then manually edit each price. For products with complex pricing (e.g. base model × color × accessory kit × subscription tier) this means editing hundreds of rows by hand.
+Standard PrestaShop combination generation is cartesian: pick all attribute groups, generate all combinations, then manually edit each price. For products with complex pricing — base model × color × accessory kit × subscription tier — this means editing hundreds of rows by hand.
 
 **Example — a configurable product with base models, options and subscription tiers:**
 
@@ -153,6 +172,12 @@ Rule schema:
   "excludes": []
 }
 ```
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome. Please open an issue before submitting a large change.
 
 ---
 
