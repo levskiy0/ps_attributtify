@@ -72,17 +72,22 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
     protected function ajaxGetGroups(): void
     {
         $idLang = (int) $this->context->language->id;
-        $groups = AttributeGroup::getAttributesGroups($idLang);
-        usort($groups, static function (array $a, array $b): int {
-            return (int) $a['position'] - (int) $b['position'];
-        });
+
+        $rows = Db::getInstance()->executeS('
+            SELECT ag.`id_attribute_group`, ag.`group_type`, ag.`position`,
+                   agl.`name`
+            FROM `' . _DB_PREFIX_ . 'attribute_group` ag
+            LEFT JOIN `' . _DB_PREFIX_ . 'attribute_group_lang` agl
+                ON ag.`id_attribute_group` = agl.`id_attribute_group`
+                AND agl.`id_lang` = ' . $idLang . '
+            ORDER BY ag.`position` ASC, agl.`name` ASC
+        ');
 
         $out = [];
-        foreach ($groups as $g) {
+        foreach ((array) $rows as $g) {
             $out[] = [
                 'id_attribute_group' => (int) $g['id_attribute_group'],
-                'name'               => $g['name'],
-                'public_name'        => $g['public_name'] ?? $g['name'],
+                'name'               => $g['name'] ?? '',
                 'group_type'         => $g['group_type'] ?? 'select',
             ];
         }

@@ -331,7 +331,7 @@
                 groups.forEach(function (g) {
                     $grp.append(opt(
                         g.id_attribute_group,
-                        g.public_name || g.name,
+                        g.name,
                         parseInt(g.id_attribute_group, 10) === parseInt(pairData.id_attribute_group, 10)
                     ));
                 });
