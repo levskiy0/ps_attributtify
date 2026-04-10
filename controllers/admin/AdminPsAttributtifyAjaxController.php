@@ -52,12 +52,13 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
         $action = Tools::getValue('action');
         try {
             switch ($action) {
-                case 'getGroups':     $this->ajaxGetGroups();     break;
-                case 'getAttributes': $this->ajaxGetAttributes(); break;
-                case 'saveConfig':    $this->ajaxSaveConfig();    break;
-                case 'loadConfig':    $this->ajaxLoadConfig();    break;
-                case 'generate':      $this->ajaxGenerate();      break;
-                case 'preview':       $this->ajaxPreview();       break;
+                case 'getGroups':      $this->ajaxGetGroups();      break;
+                case 'getAttributes':  $this->ajaxGetAttributes();  break;
+                case 'getCustomTypes': $this->ajaxGetCustomTypes();  break;
+                case 'saveConfig':     $this->ajaxSaveConfig();      break;
+                case 'loadConfig':     $this->ajaxLoadConfig();      break;
+                case 'generate':       $this->ajaxGenerate();        break;
+                case 'preview':        $this->ajaxPreview();         break;
                 default:
                     $this->jsonResponse(false, 'Unknown action');
             }
@@ -82,6 +83,7 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
                 'id_attribute_group' => (int) $g['id_attribute_group'],
                 'name'               => $g['name'],
                 'public_name'        => $g['public_name'] ?? $g['name'],
+                'group_type'         => $g['group_type'] ?? 'select',
             ];
         }
         $this->jsonResponse(true, '', ['groups' => $out]);
@@ -115,6 +117,21 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
             ];
         }
         $this->jsonResponse(true, '', ['attributes' => $out]);
+    }
+
+    // ─── Custom group types ───────────────────────────────────────────────────
+
+    protected function ajaxGetCustomTypes(): void
+    {
+        $json  = Configuration::get('ATTRIBUTTIFY_CUSTOM_TYPES');
+        $types = [];
+        if (!empty($json)) {
+            $decoded = json_decode($json, true);
+            if (is_array($decoded)) {
+                $types = $decoded;
+            }
+        }
+        $this->jsonResponse(true, '', ['custom_types' => $types]);
     }
 
     // ─── Save config ─────────────────────────────────────────────────────────

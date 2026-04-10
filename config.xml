@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<module>
+    <name>ps_attributtify</name>
+    <displayName><![CDATA[Attributtify]]></displayName>
+    <version><![CDATA[1.4.0]]></version>
+    <description><![CDATA[Combination builder inside the Combinations tab &mdash; define rules, set prices, generate.]]></description>
+    <author><![CDATA[levskiy0]]></author>
+    <tab><![CDATA[administration]]></tab>
+	<confirmUninstall><![CDATA[Remove Attributtify? All saved rule configurations will be deleted.]]></confirmUninstall>
+    <is_configurable>1</is_configurable>
+    <need_instance>0</need_instance>
+</module>
