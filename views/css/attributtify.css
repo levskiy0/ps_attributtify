@@ -1,0 +1,621 @@
+/* ── Attributtify — Combination Builder ──────────────────────────────────── */
+
+#attributtify-wrapper {
+    border: 1px solid #dadde1;
+    border-radius: .25rem;
+    margin-bottom: 1.5rem;
+    background: #fff;
+    overflow: hidden;
+}
+
+#attributtify-wrapper .card-header {
+    background: #f1f3f4;
+    border-bottom: 1px solid #dadde1;
+    padding: .5rem .9rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+#attributtify-wrapper .card-header-title {
+    font-size: .875rem;
+    font-weight: 600;
+    margin: 0;
+    color: #3c4043;
+}
+
+/* ── Spreadsheet table ───────────────────────────────────────────────────── */
+.att-sheet {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: .81rem;
+}
+
+.att-sheet colgroup col:nth-child(1) { width: 50%; }
+.att-sheet colgroup col:nth-child(2) { width: 12%; }
+.att-sheet colgroup col:nth-child(3) { width: 12%; }
+.att-sheet colgroup col:nth-child(4) { width: 18%; }
+.att-sheet colgroup col:nth-child(5) { width:  8%; }
+
+/* Header row */
+.att-sheet thead th {
+    background: #f1f3f4;
+    color: #5f6368;
+    font-size: .67rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    padding: 5px 8px;
+    border: 1px solid #dadde1;
+    text-align: left;
+    white-space: nowrap;
+}
+
+/* Body cells — flat spreadsheet cells */
+.att-sheet tbody td {
+    border: 1px solid #e8eaed;
+    border-top: none;
+    padding: 0;
+    vertical-align: top;
+    background: #fff;
+    overflow: visible;
+}
+
+/* Row separator */
+.att-sheet tbody tr.attributtify-row {
+    border-top: 2px solid #c8cbd0;
+}
+
+/* Fixed row — blue left accent */
+.att-sheet tbody tr.att-row-fixed td:first-child { border-left: 4px solid #1a73e8; }
+.att-sheet tbody tr.att-row-fixed td { background: #fafcff; }
+
+/* Impact row — amber left accent */
+.att-sheet tbody tr.att-row-impact td:first-child { border-left: 4px solid #f9ab00; }
+.att-sheet tbody tr.att-row-impact td { background: #fffdf5; }
+
+/* Hover */
+.att-sheet tbody tr.att-row-fixed:hover td  { background: #f0f4ff !important; }
+.att-sheet tbody tr.att-row-impact:hover td { background: #fff8e6 !important; }
+
+/* Tabs / footers / add-buttons match row hover tint */
+.att-sheet tbody tr.att-row-fixed:hover .att-tabs,
+.att-sheet tbody tr.att-row-fixed:hover .att-chain-footer,
+.att-sheet tbody tr.att-row-fixed:hover .att-chain-add,
+.att-sheet tbody tr.att-row-fixed:hover .att-add-or-wrap { background: #eaedff; }
+
+.att-sheet tbody tr.att-row-fixed:hover .att-tab.active   { background: #f0f4ff; }
+
+.att-sheet tbody tr.att-row-impact:hover .att-tabs,
+.att-sheet tbody tr.att-row-impact:hover .att-chain-footer,
+.att-sheet tbody tr.att-row-impact:hover .att-chain-add,
+.att-sheet tbody tr.att-row-impact:hover .att-add-or-wrap { background: #fdf4d9; }
+
+.att-sheet tbody tr.att-row-impact:hover .att-tab.active  { background: #fff8e6; }
+
+/* No focus outlines anywhere in the sheet */
+.att-sheet *:focus,
+.att-sheet *:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* ── Rule cell: tab bar sits inside the cell like a sub-header ───────────── */
+.att-rule-cell {
+    padding: 0 !important;
+    vertical-align: top;
+    overflow: visible;
+}
+
+/* Tab bar — styled like a mini spreadsheet header row within the cell */
+.att-tabs {
+    display: flex;
+    border-bottom: 1px solid #e8eaed;
+    background: #f9fafb;
+}
+
+.att-tab {
+    padding: 3px 9px;
+    font-size: .65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: #9aa0a6;
+    background: transparent;
+    border: none;
+    border-right: 1px solid #e8eaed;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color .1s, background .1s;
+    line-height: 1.6;
+}
+
+.att-tab:hover { color: #3c4043; background: #f1f3f4; }
+
+.att-tab.active {
+    color: #1a73e8;
+    background: #fff;
+    box-shadow: inset 0 -2px 0 #1a73e8;
+}
+
+/* Impact rows — amber accent everywhere (default state) */
+.att-row-impact .att-tabs,
+.att-row-impact .att-chain-footer,
+.att-row-impact .att-chain-add,
+.att-row-impact .att-add-or-wrap { background: #fffbee; }
+
+.att-row-impact .att-tab.active {
+    color: #e89d00;
+    background: #fffdf5;
+    box-shadow: inset 0 -2px 0 #f9ab00;
+}
+.att-row-impact .att-add-pair,
+.att-row-impact .att-add-or-group { color: #e89d00; }
+.att-row-impact .att-add-pair:hover,
+.att-row-impact .att-add-or-group:hover { color: #c97d00; }
+
+/* Dot indicator — tab has content */
+.att-tab.has-content::after {
+    content: '';
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #9aa0a6;
+    vertical-align: super;
+    margin-left: 3px;
+}
+.att-tab[data-tab="applies"].has-content::after  { background: #f9ab00; }
+.att-tab[data-tab="excludes"].has-content::after { background: #ea4335; }
+
+/* Tab panels */
+.att-tab-panel         { display: none; }
+.att-tab-panel.active  { display: block; }
+
+/* Hint text inside applies / excludes panels */
+.att-section-hint {
+    font-size: .67rem;
+    color: #9aa0a6;
+    padding: 3px 8px 0;
+    font-style: italic;
+}
+
+/* ── Condition groups (OR logic) ─────────────────────────────────────────── */
+.att-conditions-wrap {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Each OR group — no card, just separated by the OR band */
+.att-condition-group { }
+
+.att-or-divider {
+    text-align: center;
+    font-size: .62rem;
+    font-weight: 800;
+    letter-spacing: .1em;
+    color: #fff;
+    background: #9aa0a6;
+    padding: 1px 0;
+    line-height: 1.4;
+}
+
+/* "Add OR block" button */
+.att-add-or-wrap {
+    padding: 2px 6px 3px;
+    background: #fafafa;
+    border-top: 1px solid #f0f0f0;
+}
+
+.att-add-or-group {
+    border: none;
+    background: transparent;
+    color: #1a73e8;
+    font-size: .68rem;
+    padding: 1px 2px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    line-height: 1.4;
+}
+.att-add-or-group:hover { color: #1557b0; text-decoration: underline; }
+
+/* ── AND-chain of condition pairs ────────────────────────────────────────── */
+.att-chain { display: flex; flex-direction: column; }
+
+.att-pair {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid #e8eaed;
+    min-height: 27px;
+}
+.att-pair:last-of-type { border-bottom: none; }
+
+.att-pair-group {
+    width: 34%;
+    flex-shrink: 0;
+    border-right: 1px solid #e8eaed;
+    min-width: 0;
+}
+
+.att-pair-values { flex: 1; min-width: 0; }
+
+.att-pair-remove {
+    width: 22px;
+    flex-shrink: 0;
+    border-left: 1px solid #e8eaed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.att-remove-pair {
+    border: none;
+    background: transparent;
+    color: #c5c6c7;
+    padding: 0;
+    width: 22px;
+    min-height: 27px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: color .12s;
+}
+.att-pair:hover .att-remove-pair { color: #ea4335; }
+.att-remove-pair .material-icons  { font-size: 13px; }
+
+/* Chain footer: "add condition" + "remove block ×" side-by-side */
+.att-chain-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 4px 2px 6px;
+    border-top: 1px solid #f0f0f0;
+    background: #fafafa;
+}
+
+.att-chain-add {
+    padding: 2px 4px 2px 6px;
+    background: #fafafa;
+    border-top: 1px solid #f0f0f0;
+}
+
+.att-add-pair {
+    border: none;
+    background: transparent;
+    color: #1a73e8;
+    font-size: .68rem;
+    padding: 1px 2px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    line-height: 1.4;
+}
+.att-add-pair:hover { color: #1557b0; text-decoration: underline; }
+
+/* × button to remove an OR block (sits right-aligned in chain-footer) */
+.att-remove-cg {
+    border: none;
+    background: transparent;
+    color: #d0d3d6;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 2px;
+    flex-shrink: 0;
+    transition: color .1s, background .1s;
+}
+.att-remove-cg:hover { color: #ea4335; background: #fce8e6; }
+.att-remove-cg .material-icons { font-size: 13px; }
+
+/* ── Add-row footer row ──────────────────────────────────────────────────── */
+.att-add-row-foot td {
+    border: 1px solid #e8eaed;
+    border-top: 2px solid #dadde1;
+    padding: 5px 10px;
+    font-size: .75rem;
+    color: #9aa0a6;
+    background: #fafafa;
+    cursor: pointer;
+    user-select: none;
+    text-align: left;
+}
+
+.att-add-row-foot:hover td {
+    background: #f0f4ff;
+    color: #1a73e8;
+}
+
+.att-add-row-foot .material-icons {
+    font-size: 14px;
+    vertical-align: middle;
+}
+
+/* ── Type / Value / Extras cells ─────────────────────────────────────────── */
+.att-type-cell    { vertical-align: middle !important; padding: 3px 6px !important; }
+.att-value-cell   { vertical-align: middle !important; padding: 3px 6px !important; }
+.att-extras-cell  { vertical-align: middle !important; padding: 3px 6px !important; }
+
+.att-value-wrap {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+.att-value-unit {
+    font-size: .73rem;
+    color: #9aa0a6;
+    flex-shrink: 0;
+}
+
+.att-extras      { display: flex; flex-direction: column; gap: 2px; }
+.att-extra-row   { display: flex; align-items: center; gap: 4px; }
+.att-extra-label {
+    font-size: .60rem;
+    font-weight: 700;
+    color: #9aa0a6;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    width: 22px;
+    flex-shrink: 0;
+    text-align: right;
+}
+
+/* ── Select2 inside cells ────────────────────────────────────────────────── */
+.att-sheet td .select2-container,
+.att-pair-group .select2-container,
+.att-pair-values .select2-container {
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+.att-sheet td .select2-container--default .select2-selection--single {
+    border: none;
+    border-radius: 0;
+    height: 27px;
+    background: transparent;
+    box-shadow: none;
+}
+.att-sheet td .select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 27px;
+    font-size: .80rem;
+    padding-left: 7px;
+    padding-right: 20px;
+    color: #3c4043;
+}
+.att-sheet td .select2-container--default .select2-selection--single .select2-selection__placeholder { color: #bbb; }
+.att-sheet td .select2-container--default .select2-selection--single .select2-selection__arrow { height: 25px; width: 20px; }
+.att-sheet td .select2-container--default .select2-selection--single .select2-selection__arrow b { border-top-color: #9aa0a6; }
+.att-sheet td .select2-container--default.select2-container--open .select2-selection--single .select2-selection__arrow b { border-bottom-color: #9aa0a6; }
+
+.att-sheet td .select2-container--default .select2-selection--multiple {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    min-height: 27px;
+    padding: 1px 3px;
+    box-shadow: none;
+}
+.att-sheet td .select2-container--default .select2-selection--multiple .select2-selection__choice {
+    font-size: .68rem;
+    margin: 2px 2px 2px 0;
+    padding: 0 4px;
+    background: #e8f0fe;
+    border: 1px solid #c5d5f7;
+    color: #1a56db;
+    border-radius: 2px;
+    white-space: normal;
+    word-break: break-word;
+    max-width: 100%;
+}
+.att-sheet td .select2-container--default .select2-selection--multiple .select2-selection__choice__remove { color: #1a56db; margin-right: 2px; }
+.att-sheet td .select2-container--default .select2-selection--multiple .select2-selection__placeholder { font-size: .75rem; color: #bbb; margin-top: 3px; }
+.att-sheet td .select2-container--default .select2-selection--multiple .select2-search__field { font-size: .75rem; margin: 1px 0; }
+
+/* ── Native inputs inside cells ──────────────────────────────────────────── */
+.att-sheet td .form-control-sm,
+.att-sheet td .form-control {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    width: 100%;
+    height: 27px;
+    padding: 0 6px;
+    font-size: .80rem;
+    box-shadow: none;
+    color: #3c4043;
+}
+.att-sheet td .form-control-sm:focus,
+.att-sheet td .form-control:focus {
+    outline: none;
+    box-shadow: none;
+    background: transparent;
+}
+
+/* Compact extra inputs */
+.att-extras .form-control,
+.att-extras .form-control-sm {
+    height: 22px;
+    font-size: .73rem;
+    padding: 0 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+/* ── Delete button ───────────────────────────────────────────────────────── */
+.att-sheet td .attributtify-remove {
+    border: none;
+    background: transparent;
+    color: #c5c6c7;
+    padding: 0;
+    width: 100%;
+    min-height: 30px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: color .12s;
+}
+.att-sheet tbody tr:hover .attributtify-remove { color: #ea4335; }
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+.attributtify-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .3rem;
+    padding: .45rem .75rem;
+    border-top: 1px solid #dadde1;
+    background: #f1f3f4;
+}
+
+#attributtify-status { font-size: .78rem; margin-left: .25rem; }
+
+/* ── Delete-confirmation setting (below toolbar) ─────────────────────────── */
+.att-delete-settings {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1.5rem;
+    padding: .3rem .9rem;
+    border-top: 1px solid #e8eaed;
+    background: #fafafa;
+}
+
+.att-confirm-label {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .75rem;
+    color: #5f6368;
+    cursor: pointer;
+    user-select: none;
+    margin: 0;
+}
+
+.att-confirm-label input[type="checkbox"] {
+    width: 13px;
+    height: 13px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: #1a73e8;
+}
+
+/* ── Legend ──────────────────────────────────────────────────────────────── */
+.attributtify-legend {
+    font-size: .80rem;
+    color: #0c5460;
+    line-height: 1.5;
+    padding: .5rem .9rem;
+    border-top: 1px solid #bee5eb;
+    background: #d1ecf1;
+}
+
+/* ── Repo link ───────────────────────────────────────────────────────────── */
+.attributtify-repo-link {
+    font-size: .75rem;
+    text-align: right;
+    padding: .35rem .9rem;
+    border-top: 1px solid #e8eaed;
+    background: #f8f9fa;
+    color: #6c757d;
+}
+
+.attributtify-repo-link a {
+    color: #6c757d;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+}
+
+.attributtify-repo-link a:hover {
+    color: #1a73e8;
+    text-decoration: underline;
+}
+
+/* ── Preview modal ───────────────────────────────────────────────────────── */
+.att-preview-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.att-preview-dialog {
+    background: #fff;
+    border-radius: .375rem;
+    width: min(860px, 95vw);
+    max-height: 82vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,.25);
+}
+.att-preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .55rem 1rem;
+    border-bottom: 1px solid #e0e0e0;
+    background: #f8f9fa;
+    border-radius: .375rem .375rem 0 0;
+    flex-shrink: 0;
+}
+.att-preview-header span { font-size: .88rem; font-weight: 600; color: #3c4043; }
+.att-preview-close {
+    border: none;
+    background: transparent;
+    font-size: 1.1rem;
+    color: #9aa0a6;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 4px;
+}
+.att-preview-close:hover { color: #ea4335; }
+.att-preview-body { overflow-y: auto; flex: 1; }
+.att-preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .80rem;
+}
+.att-preview-table thead th {
+    background: #f1f3f4;
+    padding: 5px 10px;
+    border-bottom: 1px solid #dadde1;
+    font-size: .67rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #5f6368;
+    position: sticky;
+    top: 0;
+}
+.att-preview-table tbody td {
+    padding: 4px 10px;
+    border-bottom: 1px solid #f0f0f0;
+    color: #3c4043;
+}
+.att-preview-table tbody tr:hover td { background: #f8f9fa; }
+.att-preview-price  { font-weight: 600; color: #1a73e8; }
+.att-preview-impact { font-size: .73rem; color: #5f6368; }
+.att-preview-ref    { font-size: .73rem; font-family: monospace; color: #5f6368; }
+.att-preview-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: .5rem;
+    padding: .55rem 1rem;
+    border-top: 1px solid #e0e0e0;
+    background: #f8f9fa;
+    border-radius: 0 0 .375rem .375rem;
+    flex-shrink: 0;
+}
