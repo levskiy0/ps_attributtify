@@ -46,7 +46,7 @@ class Ps_Attributtify extends Module
     public function uninstall(): bool
     {
         Db::getInstance()->execute(
-            'DELETE FROM `' . _DB_PREFIX_ . 'configuration` WHERE `name` LIKE "PS_ATTRIBUTTIFY_PRODUCT_%"'
+            'DELETE FROM `' . _DB_PREFIX_ . 'configuration` WHERE `name` LIKE "ATTRIBUTTIFY_PRODUCT_%"'
         );
         Db::getInstance()->execute(
             'DELETE FROM `' . _DB_PREFIX_ . 'configuration_lang`'
