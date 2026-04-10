@@ -42,12 +42,12 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
         parent::__construct();
     }
 
-    public function viewAccess($disable = false)
+    public function viewAccess($disable = false): bool
     {
         return (bool) $this->context->employee->id;
     }
 
-    public function postProcess()
+    public function postProcess(): void
     {
         $action = Tools::getValue('action');
         try {

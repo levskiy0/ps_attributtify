@@ -64,8 +64,7 @@ The panel appears inside the **Combinations** tab of the product page, above the
 |---|---|
 | **Save** | Persist the current rule table to the database (stored as JSON in `ps_configuration`). |
 | **Load** | Discard unsaved changes and reload the last saved config. Prompts if there are unsaved changes. |
-| **Preview** | Save → compute combinations server-side → show a preview table. No combinations are created yet. |
-| **Generate** | Save → compute → create/update combinations in PrestaShop. Sets the first combination as default. |
+| **Preview & Generate** | Save → compute combinations server-side → show a preview table → confirm → create/update combinations in PrestaShop. |
 
 ### Settings strip
 
@@ -108,11 +107,11 @@ Uninstalling removes all saved rule configurations (`ATTRIBUTTIFY_PRODUCT_*` key
 ## Architecture
 
 ```
-attributtify/
-├── attributtify.php                          # Module class, hook registration
+ps_attributtify/
+├── ps_attributtify.php                          # Module class, hook registration
 ├── controllers/
 │   └── admin/
-│       └── AdminAttributtifyAjaxController.php   # AJAX: saveConfig, loadConfig, preview, generate
+│       └── AdminPsAttributtifyAjaxController.php   # AJAX: saveConfig, loadConfig, preview, generate
 └── views/
     ├── css/
     │   ├── attributtify.css                  # Spreadsheet-style UI
@@ -127,8 +126,8 @@ attributtify/
 |---|---|
 | `saveConfig` | Saves serialised rules JSON for the product. |
 | `loadConfig` | Returns saved rules JSON for the product. |
-| `previewCombinations` | Computes combinations without writing to DB. Returns preview array. |
-| `generateCombinations` | Computes and creates/updates combinations in PrestaShop. |
+| `preview` | Computes combinations without writing to DB. Returns preview array. |
+| `generate` | Computes and creates/updates combinations in PrestaShop. |
 
 ### Data storage
 
@@ -141,8 +140,8 @@ Rule schema:
   "price_type": "fixed | impact | impact_pct",
   "price_value": 1234.56,
   "qty": 1,
-  "ref_pattern": "WK-{n}",
-  "weight_delta": 0,
+  "reference": "WK-{n}",
+  "weight": 0,
   "condition_groups": [
     {
       "pairs": [

@@ -62,11 +62,8 @@
             '        <button type="button" class="btn btn-outline-secondary btn-sm" id="attributtify-load">',
             '          <i class="material-icons" style="font-size:16px;vertical-align:middle">refresh</i> Load',
             '        </button>',
-            '        <button type="button" class="btn btn-outline-info btn-sm" id="attributtify-preview">',
-            '          <i class="material-icons" style="font-size:16px;vertical-align:middle">visibility</i> Preview',
-            '        </button>',
             '        <button type="button" class="btn btn-success btn-sm" id="attributtify-generate">',
-            '          <i class="material-icons" style="font-size:16px;vertical-align:middle">sync</i> Generate',
+            '          <i class="material-icons" style="font-size:16px;vertical-align:middle">visibility</i> Preview &amp; Generate',
             '        </button>',
             '        <span id="attributtify-status"></span>',
             '      </div>',
@@ -88,9 +85,18 @@
             '        &nbsp;&nbsp;<strong>Impact $/%</strong> \u2014 all matching impact rules are summed and added to the base price.',
             '      </div>',
             '      <div class="attributtify-repo-link">',
-            '        <a href="https://github.com/levskiy0/ps_attributtify" target="_blank" rel="noopener noreferrer">',
-            '          <i class="material-icons" style="font-size:14px;vertical-align:middle">code</i>',
-            '          github.com/levskiy0/ps_attributtify',
+            '        <a href="https://github.com/levskiy0/ps_attributtify" target="_blank" rel="noopener noreferrer" class="att-gh-btn">',
+            '          <svg class="att-gh-icon" viewBox="0 0 16 16" aria-hidden="true">',
+            '            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38',
+            '              0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13',
+            '              -.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66',
+            '              .07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15',
+            '              -.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27',
+            '              .68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12',
+            '              .51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48',
+            '              0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>',
+            '          </svg>',
+            '          Module page',
             '        </a>',
             '      </div>',
             '    </div>',
@@ -111,6 +117,7 @@
             '          <th>Impact</th>',
             '          <th>Qty</th>',
             '          <th>Reference</th>',
+            '          <th>Weight</th>',
             '        </tr></thead>',
             '        <tbody id="att-preview-rows"></tbody>',
             '      </table>',
@@ -703,13 +710,15 @@
         function renderPreview(items) {
             var $tbody = $('#att-preview-rows').empty();
             (items || []).forEach(function (it) {
+                var wt = parseFloat(it.weight);
                 var $tr = $('<tr>').append(
                     $('<td>').text(it.n),
                     $('<td>').text(it.attrs || ''),
                     $('<td class="att-preview-price">').text(fmtMoney(it.price)),
                     $('<td class="att-preview-impact">').text(fmtImpact(it.impact)),
                     $('<td>').text(it.qty != null ? it.qty : 0),
-                    $('<td class="att-preview-ref">').text(it.reference || '')
+                    $('<td class="att-preview-ref">').text(it.reference || ''),
+                    $('<td>').text(isFinite(wt) && wt !== 0 ? wt.toFixed(4) : '')
                 );
                 $tbody.append($tr);
             });
@@ -718,30 +727,6 @@
 
         function showPreviewModal() { $('#att-preview-modal').css('display', 'flex'); }
         function hidePreviewModal() { $('#att-preview-modal').hide(); }
-
-        // ── Preview button ────────────────────────────────────────────────────
-        $('#attributtify-preview').on('click', function () {
-            setStatus('Computing preview\u2026', 'info');
-            ajax('saveConfig', { id_product: productId, rows: JSON.stringify(serialise()) })
-                .done(function (save) {
-                    if (!save || !save.success) {
-                        setStatus(save && save.message ? save.message : 'Save step failed.', 'danger');
-                        return;
-                    }
-                    ajax('preview', { id_product: productId, auto_refs: $autoRefsChk.is(':checked') ? '1' : '0' })
-                        .done(function (r) {
-                            if (r && r.success) {
-                                renderPreview(r.preview || []);
-                                showPreviewModal();
-                                setStatus('Preview: ' + (r.count || 0) + ' combinations.', 'info');
-                            } else {
-                                setStatus(r && r.message ? r.message : 'Preview failed.', 'danger');
-                            }
-                        })
-                        .fail(function () { setStatus('AJAX error.', 'danger'); });
-                })
-                .fail(function () { setStatus('AJAX error.', 'danger'); });
-        });
 
         // ── Generate button (saves then previews) ─────────────────────────────
         $('#attributtify-generate').on('click', function () {
