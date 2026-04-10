@@ -346,6 +346,24 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
             }
         }
 
+        // ── Build attr→group map for group-aware anti-amplification ─────────
+        // Prevents multiple attributes from the same exclusive-choice group
+        // (e.g. two installation kit sizes, two AI tiers) from being stacked
+        // onto the same combination tuple across Phase 2 iterations.
+        $attrGroupMap = [];
+        foreach ($rows as $mapRow) {
+            $mapRow = $normaliseRow($mapRow);
+            foreach ($mapRow['condition_groups'] as $cg) {
+                foreach ((array) ($cg['pairs'] ?? []) as $pair) {
+                    $gid = (int) ($pair['id_attribute_group'] ?? 0);
+                    if ($gid <= 0) { continue; }
+                    foreach ((array) ($pair['id_attributes'] ?? []) as $aid) {
+                        $attrGroupMap[(int) $aid] = $gid;
+                    }
+                }
+            }
+        }
+
         // ── Phase 2: impact rules expand tuples (iterative) ──────────────────
         $maxIterations = 10;
         for ($iter = 0; $iter < $maxIterations; $iter++) {
@@ -358,21 +376,32 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
                 $appliesTo      = (array) ($row['applies_to'] ?? []);
                 $excludes       = (array) ($row['excludes']   ?? []);
 
-                $impactAttrsFlat = [];
-                $impactAxesAll   = [];
+                $impactAxesAll  = [];
+                $impactGroupIds = [];
                 foreach ($condGroups as $cg) {
                     $axes = $buildAxesFromPairs((array) ($cg['pairs'] ?? []));
                     if (!empty($axes)) {
-                        $impactAxesAll[]  = $axes;
-                        $impactAttrsFlat  = array_merge($impactAttrsFlat, ...array_values($axes));
+                        $impactAxesAll[] = $axes;
+                    }
+                    foreach ((array) ($cg['pairs'] ?? []) as $pair) {
+                        $gid = (int) ($pair['id_attribute_group'] ?? 0);
+                        if ($gid > 0) { $impactGroupIds[] = $gid; }
                     }
                 }
+                $impactGroupIds = array_unique($impactGroupIds);
                 if (empty($impactAxesAll)) { continue; }
 
                 foreach (array_values($tupleMap) as $baseTuple) {
-                    if (!$matchesPairs($baseTuple, $appliesTo))     { continue; }
-                    if ($matchesExcludes($baseTuple, $excludes))    { continue; }
-                    if (!empty(array_intersect($baseTuple, $impactAttrsFlat))) { continue; }
+                    if (!$matchesPairs($baseTuple, $appliesTo))  { continue; }
+                    if ($matchesExcludes($baseTuple, $excludes)) { continue; }
+
+                    // Group-aware anti-amplification: if the tuple already contains
+                    // any attribute from the same group as what this rule adds,
+                    // skip — prevents kit_10m + kit_20m or AI_1yr + AI_3yr stacking.
+                    $tupleGroups = array_map(static function (int $aid) use ($attrGroupMap): int {
+                        return $attrGroupMap[$aid] ?? 0;
+                    }, $baseTuple);
+                    if (!empty(array_intersect($tupleGroups, $impactGroupIds))) { continue; }
 
                     foreach ($impactAxesAll as $impactAxes) {
                         foreach ($this->cartesian($impactAxes) as $impactAttrs) {
@@ -383,6 +412,49 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
                 }
             }
             if ($added === 0) { break; }
+        }
+
+        // ── Drop tuples missing a required impact group (always-on) ──────────
+        // Every impact group is implicitly required — same as PrestaShop's own
+        // combination generator. To make a group optional, add an explicit
+        // "None" attribute with zero impact (that way the no-selection case is
+        // represented by a real combination, not by the absence of the group).
+        //
+        // For each impact group G, collect all the applies_to conditions from
+        // every rule that adds attributes from G. A tuple must contain at least
+        // one attribute from G if ANY of those applies_to conditions match it.
+
+        $impactGroupApplies = []; // group_id => [ applies_to[], ... ]
+        foreach ($rows as $row) {
+            $priceType = $row['price_type'] ?? 'impact';
+            if ($priceType !== 'impact' && $priceType !== 'impact_pct') { continue; }
+            $row       = $normaliseRow($row);
+            $appliesTo = (array) ($row['applies_to'] ?? []);
+            foreach ($row['condition_groups'] as $cg) {
+                foreach ((array) ($cg['pairs'] ?? []) as $pair) {
+                    $gid = (int) ($pair['id_attribute_group'] ?? 0);
+                    if ($gid > 0) { $impactGroupApplies[$gid][] = $appliesTo; }
+                }
+            }
+        }
+
+        foreach ($impactGroupApplies as $reqGid => $allAppliesTo) {
+            foreach ($tupleMap as $k => $tuple) {
+                // Does any impact rule for group $reqGid apply to this tuple?
+                $anyApplies = false;
+                foreach ($allAppliesTo as $appliesTo) {
+                    if ($matchesPairs($tuple, $appliesTo)) { $anyApplies = true; break; }
+                }
+                if (!$anyApplies) { continue; }
+
+                // Tuple must contain at least one attribute from the required group
+                $tupleGroups = array_map(static function (int $aid) use ($attrGroupMap): int {
+                    return $attrGroupMap[$aid] ?? 0;
+                }, $tuple);
+                if (!in_array($reqGid, $tupleGroups, true)) {
+                    unset($tupleMap[$k]);
+                }
+            }
         }
 
         return array_values($tupleMap);

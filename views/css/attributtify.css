@@ -341,6 +341,7 @@
 
 /* ── Type / Value / Extras cells ─────────────────────────────────────────── */
 .att-type-cell    { vertical-align: middle !important; padding: 3px 6px !important; }
+
 .att-value-cell   { vertical-align: middle !important; padding: 3px 6px !important; }
 .att-extras-cell  { vertical-align: middle !important; padding: 3px 6px !important; }
 

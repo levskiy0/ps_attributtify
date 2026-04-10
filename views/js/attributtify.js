@@ -617,6 +617,7 @@
                 $ruleCell.find('.att-tab-panel').removeClass('active');
                 $ruleCell.find('.att-tab-panel[data-panel="conditions"]').addClass('active');
             }
+
         });
 
         // Add OR condition group
