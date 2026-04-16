@@ -398,21 +398,13 @@
             var condGroups = data.condition_groups ||
                 (data.pairs ? [{ pairs: data.pairs }] : [{}]);
 
-            // ── Rule cell ─────────────────────────────────────────────────────
+            // ── Rule cell: two-column layout ──────────────────────────────────
             var $ruleCell = $('<td class="att-rule-cell">');
 
-            // Tab bar
-            var $tabs = $('<div class="att-tabs">').appendTo($ruleCell);
-            $tabs.append(
-                $('<button type="button" class="att-tab active" data-tab="conditions">Conditions</button>'),
-                $('<button type="button" class="att-tab" data-tab="applies">Applies to</button>' )
-                    .toggleClass('d-none', isFixed),
-                $('<button type="button" class="att-tab" data-tab="excludes">Excludes</button>')
-            );
+            // Left column — Conditions (top) + Excludes (bottom)
+            var $leftCol  = $('<div class="att-col att-col-left">');
 
-            // Conditions panel
-            var $condPanel = $('<div class="att-tab-panel active" data-panel="conditions">').appendTo($ruleCell);
-            var $condWrap  = $('<div class="att-conditions-wrap">').appendTo($condPanel);
+            var $condWrap = $('<div class="att-conditions-wrap">');
             condGroups.forEach(function (cg, i) {
                 if (i > 0) { $condWrap.append($('<div class="att-or-divider">OR</div>')); }
                 $condWrap.append(buildConditionGroup(cg));
@@ -423,21 +415,11 @@
                         .html('<i class="material-icons" style="font-size:12px;vertical-align:middle">add_circle_outline</i> Add OR block')
                 )
             );
-
-            // Applies-to panel
-            var $appliesPanel = $('<div class="att-tab-panel" data-panel="applies">').appendTo($ruleCell);
-            var $appliesChain = $('<div class="att-chain att-applies-chain">');
-            (data.applies_to || []).forEach(function (p) { $appliesChain.append(buildPair(p)); });
-            $appliesChain.append(
-                $('<div class="att-chain-add">').append(
-                    $('<button type="button" class="att-add-pair">')
-                        .html('<i class="material-icons" style="font-size:13px;vertical-align:middle">add</i> filter')
-                )
+            $leftCol.append(
+                $('<div class="att-section-label att-label-conditions">Conditions</div>'),
+                $condWrap
             );
-            $appliesPanel.append($appliesChain);
 
-            // Excludes panel
-            var $excludesPanel = $('<div class="att-tab-panel" data-panel="excludes">').appendTo($ruleCell);
             var $excludesChain = $('<div class="att-chain att-excludes-chain">');
             (data.excludes || []).forEach(function (p) { $excludesChain.append(buildPair(p)); });
             $excludesChain.append(
@@ -446,7 +428,27 @@
                         .html('<i class="material-icons" style="font-size:13px;vertical-align:middle">add</i> exclude')
                 )
             );
-            $excludesPanel.append($excludesChain);
+            $leftCol.append(
+                $('<div class="att-section-label att-label-excludes">Excludes</div>'),
+                $excludesChain
+            );
+
+            // Right column — Applies to (hidden for fixed rows)
+            var $rightCol  = $('<div class="att-col att-col-right">').toggleClass('d-none', isFixed);
+            var $appliesChain = $('<div class="att-chain att-applies-chain">');
+            (data.applies_to || []).forEach(function (p) { $appliesChain.append(buildPair(p)); });
+            $appliesChain.append(
+                $('<div class="att-chain-add">').append(
+                    $('<button type="button" class="att-add-pair">')
+                        .html('<i class="material-icons" style="font-size:13px;vertical-align:middle">add</i> filter')
+                )
+            );
+            $rightCol.append(
+                $('<div class="att-section-label att-label-applies">Applies to</div>'),
+                $appliesChain
+            );
+
+            $ruleCell.append($('<div class="att-cols">').append($leftCol, $rightCol));
 
             // ── Type cell ─────────────────────────────────────────────────────
             var $ptype = $('<select class="form-control form-control-sm attributtify-ptype">');
@@ -585,17 +587,6 @@
             markDirty();
         });
 
-        // Tab switching
-        $rows.on('click', '.att-tab', function () {
-            var $tab      = $(this);
-            var $ruleCell = $tab.closest('.att-rule-cell');
-            var target    = $tab.data('tab');
-            $ruleCell.find('.att-tab').removeClass('active');
-            $tab.addClass('active');
-            $ruleCell.find('.att-tab-panel').removeClass('active');
-            $ruleCell.find('.att-tab-panel[data-panel="' + target + '"]').addClass('active');
-        });
-
         // Delete row
         $rows.on('click', '.attributtify-remove', function () {
             if (shouldConfirm() && !confirm('Remove this rule row?')) { return; }
@@ -695,18 +686,7 @@
 
             $tr.removeClass('att-row-fixed att-row-impact').addClass(rowClassFor(ptype));
             $tr.find('.att-value-unit').text(unitFor(ptype));
-
-            var $appliesTab = $ruleCell.find('.att-tab[data-tab="applies"]');
-            $appliesTab.toggleClass('d-none', isFixed);
-
-            // If applies tab becomes hidden while active, fall back to conditions tab
-            if (isFixed && $appliesTab.hasClass('active')) {
-                $ruleCell.find('.att-tab').removeClass('active');
-                $ruleCell.find('.att-tab[data-tab="conditions"]').addClass('active');
-                $ruleCell.find('.att-tab-panel').removeClass('active');
-                $ruleCell.find('.att-tab-panel[data-panel="conditions"]').addClass('active');
-            }
-
+            $tr.find('.att-col-right').toggleClass('d-none', isFixed);
         });
 
         // Add OR condition group
