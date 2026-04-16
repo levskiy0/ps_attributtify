@@ -487,14 +487,21 @@
             );
 
             // ── Delete cell ───────────────────────────────────────────────────
-            var $del = $('<button type="button" class="attributtify-remove" title="Remove row">' +
+            var $drag = $('<span class="att-drag-handle" title="Drag to reorder">' +
+                '<i class="material-icons">drag_indicator</i></span>');
+            var $del  = $('<button type="button" class="attributtify-remove" title="Remove row">' +
                 '<i class="material-icons">close</i></button>');
-            var $delCell = $('<td class="att-del-cell">').append($del);
+            var $copy = $('<button type="button" class="attributtify-copy" title="Duplicate row">' +
+                '<i class="material-icons">content_copy</i></button>');
+            var $delCell = $('<td class="att-del-cell">').append(
+                $('<div class="att-action-btns">').append($drag, $copy, $del)
+            );
 
             var $tr = $('<tr class="attributtify-row ' + rowClassFor(priceType) + '">').append(
                 $ruleCell, $typeCell, $valueCell, $extrasCell, $delCell
             );
 
+            makeRowDraggable($tr);
             syncTabBadges($ruleCell);
             return $tr;
         }
@@ -547,6 +554,28 @@
             return out;
         }
 
+        // ── Serialise single row ──────────────────────────────────────────────
+        function serialiseRow($tr) {
+            var ptype = $tr.find('.attributtify-ptype').val();
+            var conditionGroups = [];
+            $tr.find('.att-condition-group').each(function () {
+                var cgPairs = collectPairs($(this).find('.att-main-chain'));
+                if (cgPairs.length > 0) { conditionGroups.push({ pairs: cgPairs }); }
+            });
+            var qtyVal = $tr.find('.attributtify-qty').val();
+            var wtVal  = $tr.find('.attributtify-weight').val();
+            return {
+                condition_groups: conditionGroups,
+                applies_to:       collectPairs($tr.find('.att-applies-chain')),
+                excludes:         collectPairs($tr.find('.att-excludes-chain')),
+                price_type:       ptype,
+                price_value:      parseFloat($tr.find('.attributtify-pvalue').val()) || 0,
+                qty:              (qtyVal === '' || qtyVal == null) ? 0 : (parseInt(qtyVal, 10) || 0),
+                reference:        $tr.find('.attributtify-ref').val() || '',
+                weight:           (wtVal === '' || wtVal == null) ? 0 : (parseFloat(wtVal) || 0)
+            };
+        }
+
         // ── Events ────────────────────────────────────────────────────────────
         // Any input/select change inside rows = dirty
         $rows.on('input change', 'input, select, textarea', function () { markDirty(); });
@@ -576,6 +605,59 @@
             $(this).closest('tr').remove();
             markDirty();
         });
+
+        // Duplicate row
+        $rows.on('click', '.attributtify-copy', function () {
+            var $tr  = $(this).closest('tr');
+            var data = serialiseRow($tr);
+            var $newRow = buildRow(data);
+            $tr.after($newRow);
+            markDirty();
+        });
+
+        // ── Drag-and-drop row sorting ─────────────────────────────────────────
+        var $dragSrc = null;
+
+        $rows.on('dragstart', '.attributtify-row', function (e) {
+            $dragSrc = $(this);
+            $(this).addClass('att-dragging');
+            e.originalEvent.dataTransfer.effectAllowed = 'move';
+            e.originalEvent.dataTransfer.setData('text/plain', '');
+        });
+
+        $rows.on('dragend', '.attributtify-row', function () {
+            $(this).removeClass('att-dragging');
+            $rows.find('.attributtify-row').removeClass('att-drag-over');
+            $dragSrc = null;
+        });
+
+        $rows.on('dragover', '.attributtify-row', function (e) {
+            e.preventDefault();
+            e.originalEvent.dataTransfer.dropEffect = 'move';
+            if ($dragSrc && !$(this).is($dragSrc)) {
+                $rows.find('.attributtify-row').removeClass('att-drag-over');
+                $(this).addClass('att-drag-over');
+            }
+        });
+
+        $rows.on('drop', '.attributtify-row', function (e) {
+            e.preventDefault();
+            if (!$dragSrc || $(this).is($dragSrc)) { return; }
+            var $target = $(this);
+            var srcIdx = $rows.find('.attributtify-row').index($dragSrc);
+            var tgtIdx = $rows.find('.attributtify-row').index($target);
+            if (srcIdx < tgtIdx) { $target.after($dragSrc); } else { $target.before($dragSrc); }
+            $rows.find('.attributtify-row').removeClass('att-drag-over');
+            markDirty();
+        });
+
+        // Make rows draggable after they are added
+        function makeRowDraggable($tr) {
+            var $handle = $tr.find('.att-drag-handle');
+            if (!$handle.length) { return; }
+            $handle.on('mousedown', function () { $tr.attr('draggable', 'true'); });
+            $handle.on('mouseup',   function () { $tr.attr('draggable', 'false'); });
+        }
 
         // Add a condition pair (works in both .att-chain-footer and .att-chain-add)
         $rows.on('click', '.att-add-pair', function () {

@@ -23,7 +23,7 @@ class Ps_Attributtify extends Module
     {
         $this->name = 'ps_attributtify';
         $this->tab = 'administration';
-        $this->version = '1.4.0';
+        $this->version = '1.4.1';
         $this->author = 'levskiy0';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = [

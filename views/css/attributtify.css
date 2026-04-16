@@ -450,22 +450,69 @@
     min-width: 0;
 }
 
-/* ── Delete button ───────────────────────────────────────────────────────── */
-.att-sheet td .attributtify-remove {
+/* ── Delete cell (actions column) ────────────────────────────────────────── */
+.att-del-cell {
+    vertical-align: middle !important;
+    padding: 0 !important;
+}
+
+.att-action-btns {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 0;
+    height: 100%;
+    min-height: 54px;
+}
+
+/* Shared button base */
+.att-sheet td .attributtify-remove,
+.att-sheet td .attributtify-copy {
     border: none;
     background: transparent;
-    color: #c5c6c7;
     padding: 0;
-    width: 100%;
-    min-height: 30px;
-    height: 100%;
+    width: 22px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    border-radius: 3px;
+    transition: color .12s, background .12s;
+    color: #d0d3d6;
+    flex-shrink: 0;
+}
+
+.att-sheet td .attributtify-remove .material-icons,
+.att-sheet td .attributtify-copy .material-icons { font-size: 14px; }
+
+.att-sheet tbody tr:hover .attributtify-remove         { color: #c5c6c7; }
+.att-sheet tbody tr:hover .attributtify-remove:hover   { color: #ea4335; background: #fce8e6; }
+.att-sheet tbody tr:hover .attributtify-copy           { color: #c5c6c7; }
+.att-sheet tbody tr:hover .attributtify-copy:hover     { color: #1a73e8; background: #e8f0fe; }
+
+/* Drag handle */
+.att-drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    color: #d0d3d6;
+    cursor: grab;
+    flex-shrink: 0;
+    border-radius: 3px;
     transition: color .12s;
 }
-.att-sheet tbody tr:hover .attributtify-remove { color: #ea4335; }
+.att-drag-handle .material-icons { font-size: 16px; }
+.att-sheet tbody tr:hover .att-drag-handle { color: #9aa0a6; }
+.att-drag-handle:active { cursor: grabbing; }
+
+/* Dragging state */
+.attributtify-row.att-dragging   { opacity: .45; }
+.attributtify-row.att-drag-over  { outline: 2px solid #1a73e8; outline-offset: -1px; }
 
 /* ── Toolbar ─────────────────────────────────────────────────────────────── */
 .attributtify-toolbar {
