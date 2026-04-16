@@ -401,10 +401,18 @@
             // ── Rule cell: two-column layout ──────────────────────────────────
             var $ruleCell = $('<td class="att-rule-cell">');
 
-            // Left column — Conditions (top) + Excludes (bottom)
-            var $leftCol  = $('<div class="att-col att-col-left">');
+            // Left column — tab bar: Conditions | Excludes
+            var $leftCol = $('<div class="att-col att-col-left">');
 
-            var $condWrap = $('<div class="att-conditions-wrap">');
+            var $leftTabs = $('<div class="att-col-tabs">').append(
+                $('<button type="button" class="att-col-tab active" data-col-tab="conditions">Conditions</button>'),
+                $('<button type="button" class="att-col-tab" data-col-tab="excludes">Excludes</button>')
+            );
+            $leftCol.append($leftTabs);
+
+            // Conditions panel
+            var $condPanel = $('<div class="att-col-panel active" data-col-panel="conditions">');
+            var $condWrap  = $('<div class="att-conditions-wrap">');
             condGroups.forEach(function (cg, i) {
                 if (i > 0) { $condWrap.append($('<div class="att-or-divider">OR</div>')); }
                 $condWrap.append(buildConditionGroup(cg));
@@ -415,11 +423,11 @@
                         .html('<i class="material-icons" style="font-size:12px;vertical-align:middle">add_circle_outline</i> Add OR block')
                 )
             );
-            $leftCol.append(
-                $('<div class="att-section-label att-label-conditions">Conditions</div>'),
-                $condWrap
-            );
+            $condPanel.append($condWrap);
+            $leftCol.append($condPanel);
 
+            // Excludes panel
+            var $excludesPanel = $('<div class="att-col-panel" data-col-panel="excludes">');
             var $excludesChain = $('<div class="att-chain att-excludes-chain">');
             (data.excludes || []).forEach(function (p) { $excludesChain.append(buildPair(p)); });
             $excludesChain.append(
@@ -428,13 +436,11 @@
                         .html('<i class="material-icons" style="font-size:13px;vertical-align:middle">add</i> exclude')
                 )
             );
-            $leftCol.append(
-                $('<div class="att-section-label att-label-excludes">Excludes</div>'),
-                $excludesChain
-            );
+            $excludesPanel.append($excludesChain);
+            $leftCol.append($excludesPanel);
 
             // Right column — Applies to (hidden for fixed rows)
-            var $rightCol  = $('<div class="att-col att-col-right">').toggleClass('d-none', isFixed);
+            var $rightCol = $('<div class="att-col att-col-right">').toggleClass('d-none', isFixed);
             var $appliesChain = $('<div class="att-chain att-applies-chain">');
             (data.applies_to || []).forEach(function (p) { $appliesChain.append(buildPair(p)); });
             $appliesChain.append(
@@ -444,7 +450,7 @@
                 )
             );
             $rightCol.append(
-                $('<div class="att-section-label att-label-applies">Applies to</div>'),
+                $('<div class="att-section-label">Applies to</div>'),
                 $appliesChain
             );
 
@@ -604,6 +610,17 @@
             var $newRow = buildRow(data);
             $tr.after($newRow);
             markDirty();
+        });
+
+        // Left-column tab switching (Conditions / Excludes)
+        $rows.on('click', '.att-col-tab', function () {
+            var $tab     = $(this);
+            var $leftCol = $tab.closest('.att-col-left');
+            var target   = $tab.data('col-tab');
+            $leftCol.find('.att-col-tab').removeClass('active');
+            $tab.addClass('active');
+            $leftCol.find('.att-col-panel').removeClass('active');
+            $leftCol.find('.att-col-panel[data-col-panel="' + target + '"]').addClass('active');
         });
 
         // ── Drag-and-drop row sorting ─────────────────────────────────────────
