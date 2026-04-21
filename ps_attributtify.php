@@ -43,6 +43,7 @@ class Ps_Attributtify extends Module
     {
         return parent::install()
             && $this->registerHook('displayBackOfficeHeader')
+            && $this->registerHook('actionPresentProduct')
             && $this->installTab('AdminPsAttributtifyAjax', 'Attributtify Ajax');
     }
 
@@ -175,6 +176,44 @@ class Ps_Attributtify extends Module
         Media::addJsDef([
             'attributtifyAjaxUrl' => $this->context->link->getAdminLink('AdminPsAttributtifyAjax'),
         ]);
+    }
+
+    /**
+     * @throws PrestaShop\PrestaShop\Core\Localization\Exception\LocalizationException
+     */
+    public function hookActionPresentProduct(array $params): void
+    {
+        $this->calculateAttributes($params);
+    }
+
+    /**
+     * @throws PrestaShop\PrestaShop\Core\Localization\Exception\LocalizationException
+     */
+    private function calculateAttributes(array $params): void
+    {
+        $product = new Product((int) $params['presentedProduct']['id_product']);
+        $combinations = $product->getAttributeCombinations($this->context->language->id);
+        $attributePrices = [];
+        $prices = [];
+
+        foreach ($combinations as $combination) {
+            $attributeId = $combination['id_attribute'];
+            if (!isset($attributePrices[$attributeId])) {
+                $attributePrices[$attributeId] = $combination['price'];
+            } else {
+                $attributePrices[$attributeId] = min($attributePrices[$attributeId], $combination['price']);
+            }
+        }
+
+        foreach ($attributePrices as $idAttribute => $price) {
+            $prices[$idAttribute] = $this->context->currentLocale->formatPrice(
+                $price,
+                $this->context->currency->iso_code
+            );
+        }
+
+        $params['presentedProduct']['attribute_prices'] = $prices;
+        $params['presentedProduct']['attribute_prices_raw'] = $attributePrices;
     }
 
     // ─── Tab helpers ──────────────────────────────────────────────────────────
