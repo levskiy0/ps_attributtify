@@ -205,10 +205,12 @@ class Ps_Attributtify extends Module
         }
 
         if (isset($decoded['rows']) && is_array($decoded['rows'])) {
-            $rules           = $decoded['rows'];
-            $showPriceGroups = array_flip(
-                array_map('intval', (array) ($decoded['show_price_groups'] ?? []))
-            );
+            $rules = $decoded['rows'];
+            $spg   = array_filter(array_map('intval', (array) ($decoded['show_price_groups'] ?? [])));
+            if (empty($spg)) {
+                return;
+            }
+            $showPriceGroups = array_flip($spg);
         } else {
             $rules           = $decoded;
             $showPriceGroups = null;
