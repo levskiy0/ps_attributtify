@@ -43,7 +43,7 @@ class Ps_Attributtify extends Module
     {
         return parent::install()
             && $this->registerHook('displayBackOfficeHeader')
-            && $this->registerHook('actionPresentProduct')
+            && $this->registerHook('actionProductGetAttributesGroupsAfter')
             && $this->installTab('AdminPsAttributtifyAjax', 'Attributtify Ajax');
     }
 
@@ -179,18 +179,14 @@ class Ps_Attributtify extends Module
     }
 
     /**
-     * Populate attribute_prices / attribute_prices_raw on the presented product
-     * so that theme templates can use them directly.
-     *
-     * @throws PrestaShop\PrestaShop\Core\Localization\Exception\LocalizationException
+     * Append formatted surcharge to attribute_name in the raw DB result so
+     * ProductController sees "Kit S (+€608.00)" when it builds the $groups
+     * Smarty variable — no template changes needed.
      */
-    public function hookActionPresentProduct(array &$params): void
+    public function hookActionProductGetAttributesGroupsAfter(array &$params): void
     {
-        $idProduct = (int) (
-            $params['presentedProduct']['id'] ??
-            $params['presentedProduct']['id_product'] ??
-            0
-        );
+        $product   = $params['product'] ?? null;
+        $idProduct = $product ? (int) $product->id : 0;
         if ($idProduct <= 0) {
             return;
         }
@@ -200,49 +196,37 @@ class Ps_Attributtify extends Module
             return;
         }
 
-        // Format prices
+        // Pre-format all relevant prices
         $prices = [];
         foreach ($impactMin as $idAttribute => $impact) {
             if ($impact == 0) {
                 continue;
             }
             try {
-                $prices[$idAttribute] = $this->context->currentLocale->formatPrice(
+                $formatted = $this->context->currentLocale->formatPrice(
                     abs($impact),
                     $this->context->currency->iso_code
                 );
             } catch (\Throwable $e) {
-                $prices[$idAttribute] = number_format(abs($impact), 2);
+                $formatted = number_format(abs($impact), 2);
             }
+            $sign             = $impact > 0 ? '+' : '-';
+            $prices[$idAttribute] = ' (' . $sign . $formatted . ')';
         }
 
         if (empty($prices)) {
             return;
         }
 
-        // Inject formatted price into attribute names inside groups so the
-        // theme template sees "Kit S (+€608.00)" without any template changes.
-        $groups = $params['presentedProduct']['groups'] ?? null;
-        if (!is_array($groups)) {
-            return;
-        }
-
-        foreach ($groups as &$group) {
-            if (!isset($group['attributes']) || !is_array($group['attributes'])) {
-                continue;
+        // $params['attributes_groups'] is the raw DB result (array of rows)
+        // Each row has id_attribute (int-as-string) and attribute_name keys.
+        foreach ($params['attributes_groups'] as &$row) {
+            $attrId = (int) ($row['id_attribute'] ?? 0);
+            if (isset($prices[$attrId])) {
+                $row['attribute_name'] .= $prices[$attrId];
             }
-            foreach ($group['attributes'] as $idAttribute => &$attribute) {
-                if (!isset($prices[$idAttribute])) {
-                    continue;
-                }
-                $sign = $impactMin[$idAttribute] > 0 ? '+' : '';
-                $attribute['name'] .= ' (' . $sign . $prices[$idAttribute] . ')';
-            }
-            unset($attribute);
         }
-        unset($group);
-
-        $this->context->smarty->assign('groups', $groups);
+        unset($row);
     }
 
     /**
