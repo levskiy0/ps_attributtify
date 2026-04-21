@@ -175,6 +175,33 @@ Rule schema:
 
 ---
 
+## Front-end attribute price surcharges
+
+Attributtify registers the `actionPresentProduct` hook to expose per-attribute price surcharges to front-end templates. When a product page is rendered, the module iterates all combinations, determines the minimum price impact for each attribute value, and injects two variables into the presented product:
+
+| Variable | Type | Content |
+|---|---|---|
+| `attribute_prices` | `array<int, string>` | Formatted price string keyed by `id_attribute` (e.g. `"+€1,500.00"`) |
+| `attribute_prices_raw` | `array<int, float>` | Raw float keyed by `id_attribute` |
+
+The minimum is used so that the displayed surcharge represents "from +X" — the cheapest combination that includes a given attribute.
+
+### Using in a Smarty template
+
+```smarty
+{foreach $product.combinations as $combination}
+    {assign var="aid" value=$combination.id_attribute}
+    {$combination.attribute_name}
+    {if isset($product.attribute_prices[$aid]) && $product.attribute_prices_raw[$aid] != 0}
+        ({$product.attribute_prices[$aid]})
+    {/if}
+{/foreach}
+```
+
+The raw array is useful when you need conditional logic (e.g. hide the label when the surcharge is zero, or apply custom formatting).
+
+---
+
 ## Contributing
 
 Issues and pull requests are welcome. Please open an issue before submitting a large change.
