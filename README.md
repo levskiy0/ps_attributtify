@@ -197,34 +197,6 @@ The hook assigns two standalone Smarty variables (not nested under `$product`):
 
 Only rules with `show_price: true` contribute. The first matching rule per attribute wins (rules are evaluated in the order saved).
 
-### Using in a Smarty template
-
-Inside a `{foreach}` that iterates attribute groups and their values, use `$id_attribute` (the current iteration key) to look up the surcharge:
-
-```smarty
-{* product-variants.tpl — inside the foreach over $groups *}
-{foreach from=$group.attributes key=id_attribute item=group_attribute}
-    {$group_attribute.name}
-    {if isset($attribute_prices_raw[$id_attribute]) && $attribute_prices_raw[$id_attribute] != 0}
-        <span class="attr-surcharge">
-            ({if $attribute_prices_raw[$id_attribute] > 0}+{/if}{$attribute_prices[$id_attribute]})
-        </span>
-    {/if}
-{/foreach}
-```
-
-For a toggle/checkbox attribute type (two-state group where only the "Yes" option has a surcharge), use the key of the non-zero attribute directly:
-
-```smarty
-{* Show +price next to the group label for a binary toggle *}
-{assign var=keys value=array_keys($group.attributes)}
-{if $group.group_type == 'checkbox' && isset($attribute_prices[$keys[1]])}
-    <span class="attr-surcharge">+{$attribute_prices[$keys[1]]}</span>
-{/if}
-```
-
-The raw array is useful for conditional logic (e.g. skip the label when the surcharge is zero, or apply a custom CSS class for negative values).
-
 ---
 
 ## Contributing
