@@ -196,9 +196,16 @@ class Ps_Attributtify extends Module
         }
 
         $impactMin = $this->getAttributeImpactMin($idProduct);
-        $prices    = [];
+        if (empty($impactMin)) {
+            return;
+        }
 
+        // Format prices
+        $prices = [];
         foreach ($impactMin as $idAttribute => $impact) {
+            if ($impact == 0) {
+                continue;
+            }
             try {
                 $prices[$idAttribute] = $this->context->currentLocale->formatPrice(
                     abs($impact),
@@ -209,11 +216,33 @@ class Ps_Attributtify extends Module
             }
         }
 
-        // Assign directly to Smarty — bypasses PS8 hook reference issues
-        $this->context->smarty->assign([
-            'attribute_prices'     => $prices,
-            'attribute_prices_raw' => $impactMin,
-        ]);
+        if (empty($prices)) {
+            return;
+        }
+
+        // Inject formatted price into attribute names inside groups so the
+        // theme template sees "Kit S (+€608.00)" without any template changes.
+        $groups = $params['presentedProduct']['groups'] ?? null;
+        if (!is_array($groups)) {
+            return;
+        }
+
+        foreach ($groups as &$group) {
+            if (!isset($group['attributes']) || !is_array($group['attributes'])) {
+                continue;
+            }
+            foreach ($group['attributes'] as $idAttribute => &$attribute) {
+                if (!isset($prices[$idAttribute])) {
+                    continue;
+                }
+                $sign = $impactMin[$idAttribute] > 0 ? '+' : '';
+                $attribute['name'] .= ' (' . $sign . $prices[$idAttribute] . ')';
+            }
+            unset($attribute);
+        }
+        unset($group);
+
+        $this->context->smarty->assign('groups', $groups);
     }
 
     /**
