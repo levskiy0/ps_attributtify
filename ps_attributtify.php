@@ -23,7 +23,7 @@ class Ps_Attributtify extends Module
     {
         $this->name = 'ps_attributtify';
         $this->tab = 'administration';
-        $this->version = '1.4.3';
+        $this->version = '1.4.7';
         $this->author = 'levskiy0';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = [
@@ -179,41 +179,115 @@ class Ps_Attributtify extends Module
     }
 
     /**
+     * Populate attribute_prices / attribute_prices_raw on the presented product
+     * so that theme templates can use them directly.
+     *
      * @throws PrestaShop\PrestaShop\Core\Localization\Exception\LocalizationException
      */
-    public function hookActionPresentProduct(array $params): void
+    public function hookActionPresentProduct(array &$params): void
     {
-        $this->calculateAttributes($params);
-    }
+        $idProduct = (int) (
+            $params['presentedProduct']['id'] ??
+            $params['presentedProduct']['id_product'] ??
+            0
+        );
+        if ($idProduct <= 0) {
+            return;
+        }
 
-    /**
-     * @throws PrestaShop\PrestaShop\Core\Localization\Exception\LocalizationException
-     */
-    private function calculateAttributes(array $params): void
-    {
-        $product = new Product((int) $params['presentedProduct']['id_product']);
-        $combinations = $product->getAttributeCombinations($this->context->language->id);
-        $attributePrices = [];
-        $prices = [];
+        $impactMin = $this->getAttributeImpactMin($idProduct);
+        $prices    = [];
 
-        foreach ($combinations as $combination) {
-            $attributeId = $combination['id_attribute'];
-            if (!isset($attributePrices[$attributeId])) {
-                $attributePrices[$attributeId] = $combination['price'];
-            } else {
-                $attributePrices[$attributeId] = min($attributePrices[$attributeId], $combination['price']);
+        foreach ($impactMin as $idAttribute => $impact) {
+            try {
+                $prices[$idAttribute] = $this->context->currentLocale->formatPrice(
+                    abs($impact),
+                    $this->context->currency->iso_code
+                );
+            } catch (\Throwable $e) {
+                $prices[$idAttribute] = number_format(abs($impact), 2);
             }
         }
 
-        foreach ($attributePrices as $idAttribute => $price) {
-            $prices[$idAttribute] = $this->context->currentLocale->formatPrice(
-                $price,
-                $this->context->currency->iso_code
-            );
+        // Assign directly to Smarty — bypasses PS8 hook reference issues
+        $this->context->smarty->assign([
+            'attribute_prices'     => $prices,
+            'attribute_prices_raw' => $impactMin,
+        ]);
+    }
+
+    /**
+     * Read per-attribute surcharges directly from the saved Attributtify rules.
+     *
+     * For each impact rule whose condition is a single attribute group + one or
+     * more attribute values, map every listed attribute → impact value.
+     * Rules with multi-pair conditions (combined effects) are skipped — they
+     * cannot be attributed to a single attribute unambiguously.
+     *
+     * @return array<int, float>  id_attribute → impact value
+     */
+    private function getAttributeImpactMin(int $idProduct): array
+    {
+        $json = Configuration::get('ATTRIBUTTIFY_PRODUCT_' . $idProduct);
+        if (empty($json)) {
+            return [];
         }
 
-        $params['presentedProduct']['attribute_prices'] = $prices;
-        $params['presentedProduct']['attribute_prices_raw'] = $attributePrices;
+        $decoded = json_decode($json, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        // Support both old (flat array of rules) and new ({rows, show_price_groups}) format
+        if (isset($decoded['rows']) && is_array($decoded['rows'])) {
+            $rules            = $decoded['rows'];
+            $showPriceGroups  = array_flip(
+                array_map('intval', (array) ($decoded['show_price_groups'] ?? []))
+            );
+        } else {
+            $rules            = $decoded;
+            $showPriceGroups  = null; // old format: no filter
+        }
+
+        $impacts = []; // attr_id → impact
+
+        foreach ($rules as $rule) {
+            $priceType  = $rule['price_type'] ?? 'impact';
+            $priceValue = (float) ($rule['price_value'] ?? 0);
+
+            if ($priceType !== 'impact' && $priceType !== 'impact_pct') {
+                continue;
+            }
+
+            foreach ((array) ($rule['condition_groups'] ?? []) as $cg) {
+                $pairs = (array) ($cg['pairs'] ?? []);
+
+                // Only single-pair conditions map cleanly to a per-attribute surcharge
+                if (count($pairs) !== 1) {
+                    continue;
+                }
+
+                $pairGroupId = (int) ($pairs[0]['id_attribute_group'] ?? 0);
+
+                // Filter by show_price_groups when available
+                if ($showPriceGroups !== null && !isset($showPriceGroups[$pairGroupId])) {
+                    continue;
+                }
+
+                foreach ((array) ($pairs[0]['id_attributes'] ?? []) as $attrId) {
+                    $attrId = (int) $attrId;
+                    if ($attrId <= 0) {
+                        continue;
+                    }
+                    // Keep the first-encountered value (rules are ordered by specificity)
+                    if (!isset($impacts[$attrId])) {
+                        $impacts[$attrId] = $priceValue;
+                    }
+                }
+            }
+        }
+
+        return $impacts;
     }
 
     // ─── Tab helpers ──────────────────────────────────────────────────────────

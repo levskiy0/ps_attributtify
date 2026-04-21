@@ -77,6 +77,10 @@
             '          Auto-generate references (ATTY-{attrs}) when no custom ref is set',
             '        </label>',
             '      </div>',
+            '      <div id="att-show-price-section" class="att-show-price-section" style="display:none">',
+            '        <div class="att-show-price-header">Show +price in theme for:</div>',
+            '        <div class="att-show-price-list"></div>',
+            '      </div>',
             '      <div class="attributtify-legend">',
             '        <strong>Conditions</strong> \u2014 chain of Group\u2192Values pairs; ALL must match for the rule to apply. Multiple OR blocks = any block can match.',
             '        &nbsp;&nbsp;<strong>Applies to</strong> \u2014 restrict this impact rule to combinations that already contain the specified pairs; leave empty to apply to all.',
@@ -254,6 +258,53 @@
         lsPref($autoRefsChk, 'attributtify_auto_refs',      true);
 
         function shouldConfirm() { return $confirmChk.is(':checked'); }
+
+        // ── Show-price section ────────────────────────────────────────────
+        var showPriceGroups = [];
+
+        function getShowPriceGroups() {
+            var ids = [];
+            $('#att-show-price-section .att-show-price-group:checked').each(function () {
+                ids.push(parseInt($(this).val(), 10));
+            });
+            return ids;
+        }
+
+        function refreshShowPriceSection() {
+            var $section = $('#att-show-price-section');
+            var $list    = $section.find('.att-show-price-list');
+
+            var checkedGids = {};
+            $list.find('.att-show-price-group').each(function () {
+                if ($(this).is(':checked')) { checkedGids[$(this).val()] = true; }
+            });
+            (showPriceGroups || []).forEach(function (id) { checkedGids[String(id)] = true; });
+
+            $list.empty();
+
+            var seen = {};
+            $rows.find('.attributtify-row').each(function () {
+                var $tr   = $(this);
+                var ptype = $tr.find('.attributtify-ptype').val();
+                if (ptype !== 'impact' && ptype !== 'impact_pct') { return; }
+
+                $tr.find('.att-condition-group .att-main-chain .att-pair').each(function () {
+                    var $grp = $(this).find('.attributtify-group');
+                    var gid  = parseInt($grp.val(), 10);
+                    if (!gid || seen[gid]) { return; }
+                    seen[gid] = true;
+                    var name = $grp.find('option[value="' + gid + '"]').text() || ('#' + gid);
+                    var $cb = $('<input type="checkbox" class="att-show-price-group">')
+                        .val(gid).prop('checked', !!checkedGids[String(gid)]);
+                    $cb.on('change', function () { markDirty(); });
+                    $list.append(
+                        $('<label class="att-show-price-label">').append($cb, document.createTextNode(' ' + name))
+                    );
+                });
+            });
+
+            $section.toggle($list.children().length > 0);
+        }
 
         // ── Dirty tracking ────────────────────────────────────────────────────
         var isDirty = false;
@@ -586,11 +637,15 @@
 
         // ── Events ────────────────────────────────────────────────────────────
         // Any input/select change inside rows = dirty
-        $rows.on('input change', 'input, select, textarea', function () { markDirty(); });
+        $rows.on('input change', 'input, select, textarea', function () {
+            markDirty();
+            refreshShowPriceSection();
+        });
 
         $('#attributtify-add-row').on('click', function () {
             $rows.append(buildRow({}));
             markDirty();
+            refreshShowPriceSection();
         });
 
         // Delete row
@@ -601,6 +656,7 @@
             });
             $(this).closest('tr').remove();
             markDirty();
+            refreshShowPriceSection();
         });
 
         // Duplicate row
@@ -610,6 +666,7 @@
             var $newRow = buildRow(data);
             $tr.after($newRow);
             markDirty();
+            refreshShowPriceSection();
         });
 
         // Left-column tab switching (Conditions / Excludes)
@@ -704,6 +761,7 @@
             $tr.removeClass('att-row-fixed att-row-impact').addClass(rowClassFor(ptype));
             $tr.find('.att-value-unit').text(unitFor(ptype));
             $tr.find('.att-col-right').toggleClass('d-none', isFixed);
+            refreshShowPriceSection();
         });
 
         // Add OR condition group
@@ -749,13 +807,16 @@
             if ($vals.data('select2')) { try { $vals.select2('destroy'); } catch (e) {} }
             $vals.empty();
             if (!idGrp) { applyS2Multi($vals, 'Select values\u2026'); return; }
-            loadAttributes(idGrp).done(function (attrs) { fillVals($vals, attrs, []); });
+            loadAttributes(idGrp).done(function (attrs) {
+                fillVals($vals, attrs, []);
+                refreshShowPriceSection();
+            });
         });
 
         // ── Save ──────────────────────────────────────────────────────────────
         $('#attributtify-save').on('click', function () {
             setStatus('Saving\u2026', 'info');
-            ajax('saveConfig', { id_product: productId, rows: JSON.stringify(serialise()) })
+            ajax('saveConfig', { id_product: productId, rows: JSON.stringify(serialise()), show_price_groups: JSON.stringify(getShowPriceGroups()) })
                 .done(function (r) {
                     setStatus(
                         r && r.success ? (r.message || 'Saved.') : (r.message || 'Save failed.'),
@@ -810,7 +871,7 @@
         // ── Generate button (saves then previews) ─────────────────────────────
         $('#attributtify-generate').on('click', function () {
             setStatus('Computing preview\u2026', 'info');
-            ajax('saveConfig', { id_product: productId, rows: JSON.stringify(serialise()) })
+            ajax('saveConfig', { id_product: productId, rows: JSON.stringify(serialise()), show_price_groups: JSON.stringify(getShowPriceGroups()) })
                 .done(function (save) {
                     if (!save || !save.success) {
                         setStatus(save && save.message ? save.message : 'Save step failed.', 'danger');
@@ -864,9 +925,11 @@
             loadGroups().done(function () {
                 ajax('loadConfig', { id_product: productId }).done(function (r) {
                     var saved = (r && r.success && Array.isArray(r.rows)) ? r.rows : [];
+                    showPriceGroups = (r && r.success && Array.isArray(r.show_price_groups)) ? r.show_price_groups : [];
                     if (!saved.length) {
                         $rows.append(buildRow({}));
                         setStatus('No saved config.', 'info');
+                        refreshShowPriceSection();
                         return;
                     }
                     var groupIds = {};
@@ -891,6 +954,8 @@
                         $rows.find('.att-conditions-wrap').each(function () {
                             updateRemoveCgVisibility($(this));
                         });
+                        refreshShowPriceSection();
+                        showPriceGroups = []; // consumed by refreshShowPriceSection
                         setStatus('Loaded ' + saved.length + ' rule(s).', 'success');
                         markClean();
                     });

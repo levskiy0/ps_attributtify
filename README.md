@@ -1,6 +1,6 @@
 # Attributtify — Rule-Based Combination Builder for PrestaShop 8
 
-![Version](https://img.shields.io/badge/version-1.4.0-blue)
+![Version](https://img.shields.io/badge/version-1.4.7-blue)
 ![PrestaShop](https://img.shields.io/badge/PrestaShop-8.0%2B-purple)
 ![PHP](https://img.shields.io/badge/PHP-7.4%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -152,53 +152,78 @@ ps_attributtify/
 
 Rules are stored as JSON in `ps_configuration` under the key `ATTRIBUTTIFY_PRODUCT_{id_product}`.
 
-Rule schema:
+Config object stored per product:
 
 ```json
 {
-  "price_type": "fixed | impact | impact_pct",
-  "price_value": 1234.56,
-  "qty": 1,
-  "reference": "WK-{n}",
-  "weight": 0,
-  "condition_groups": [
+  "rows": [
     {
-      "pairs": [
-        { "id_attribute_group": 3, "id_attributes": [12, 13] }
-      ]
+      "price_type": "fixed | impact | impact_pct",
+      "price_value": 1234.56,
+      "qty": 1,
+      "reference": "WK-{n}",
+      "weight": 0,
+      "condition_groups": [
+        { "pairs": [ { "id_attribute_group": 3, "id_attributes": [12, 13] } ] }
+      ],
+      "applies_to": [],
+      "excludes": []
     }
   ],
-  "applies_to": [],
-  "excludes": []
+  "show_price_groups": [3, 7]
 }
 ```
+
+`show_price_groups` — list of `id_attribute_group` values. All attribute values belonging to these groups that appear in impact rules will be exposed to Smarty via `$attribute_prices` / `$attribute_prices_raw`.
 
 ---
 
 ## Front-end attribute price surcharges
 
-Attributtify registers the `actionPresentProduct` hook to expose per-attribute price surcharges to front-end templates. When a product page is rendered, the module iterates all combinations, determines the minimum price impact for each attribute value, and injects two variables into the presented product:
+Attributtify registers the `actionPresentProduct` hook to expose per-attribute price surcharges to Smarty templates.
+
+### Enabling per-attribute
+
+Below the rule grid, a **Show +price in theme for:** strip is displayed whenever impact rules exist. It lists every **attribute group** referenced in impact-type condition rows. Check the groups whose surcharge should be visible on the product page. Unchecked groups are used for combination generation/pricing but produce no front-end label.
+
+### Smarty variables
+
+The hook assigns two standalone Smarty variables (not nested under `$product`):
 
 | Variable | Type | Content |
 |---|---|---|
-| `attribute_prices` | `array<int, string>` | Formatted price string keyed by `id_attribute` (e.g. `"+€1,500.00"`) |
-| `attribute_prices_raw` | `array<int, float>` | Raw float keyed by `id_attribute` |
+| `$attribute_prices` | `array<int, string>` | Formatted price string keyed by `id_attribute` (e.g. `"€608.00"`) |
+| `$attribute_prices_raw` | `array<int, float>` | Raw float keyed by `id_attribute` |
 
-The minimum is used so that the displayed surcharge represents "from +X" — the cheapest combination that includes a given attribute.
+Only rules with `show_price: true` contribute. The first matching rule per attribute wins (rules are evaluated in the order saved).
 
 ### Using in a Smarty template
 
+Inside a `{foreach}` that iterates attribute groups and their values, use `$id_attribute` (the current iteration key) to look up the surcharge:
+
 ```smarty
-{foreach $product.combinations as $combination}
-    {assign var="aid" value=$combination.id_attribute}
-    {$combination.attribute_name}
-    {if isset($product.attribute_prices[$aid]) && $product.attribute_prices_raw[$aid] != 0}
-        ({$product.attribute_prices[$aid]})
+{* product-variants.tpl — inside the foreach over $groups *}
+{foreach from=$group.attributes key=id_attribute item=group_attribute}
+    {$group_attribute.name}
+    {if isset($attribute_prices_raw[$id_attribute]) && $attribute_prices_raw[$id_attribute] != 0}
+        <span class="attr-surcharge">
+            ({if $attribute_prices_raw[$id_attribute] > 0}+{/if}{$attribute_prices[$id_attribute]})
+        </span>
     {/if}
 {/foreach}
 ```
 
-The raw array is useful when you need conditional logic (e.g. hide the label when the surcharge is zero, or apply custom formatting).
+For a toggle/checkbox attribute type (two-state group where only the "Yes" option has a surcharge), use the key of the non-zero attribute directly:
+
+```smarty
+{* Show +price next to the group label for a binary toggle *}
+{assign var=keys value=array_keys($group.attributes)}
+{if $group.group_type == 'checkbox' && isset($attribute_prices[$keys[1]])}
+    <span class="attr-surcharge">+{$attribute_prices[$keys[1]]}</span>
+{/if}
+```
+
+The raw array is useful for conditional logic (e.g. skip the label when the surcharge is zero, or apply a custom CSS class for negative values).
 
 ---
 

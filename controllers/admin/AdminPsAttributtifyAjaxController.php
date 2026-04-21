@@ -14,6 +14,9 @@
  *   "weight":           float
  * }
  *
+ * Config wrapper (new format, stored in ps_configuration):
+ * { "rows": [...], "show_price_groups": [id_attribute_group, ...] }
+ *
  * Generation algorithm:
  *   Phase 1 — FIXED rules: build base tuples as the cartesian product of each
  *             condition group's pairs (OR across groups inside a rule).
@@ -237,8 +240,14 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
             ];
         }
 
-        Configuration::updateValue('ATTRIBUTTIFY_PRODUCT_' . $idProduct, json_encode($clean));
-        $this->jsonResponse(true, 'Configuration saved', ['rows' => $clean]);
+        $rawGroups = Tools::getValue('show_price_groups');
+        $showPriceGroups = is_string($rawGroups) ? json_decode($rawGroups, true) : $rawGroups;
+        if (!is_array($showPriceGroups)) { $showPriceGroups = []; }
+        $showPriceGroups = array_values(array_unique(array_map('intval', array_filter($showPriceGroups))));
+
+        $payload = ['rows' => $clean, 'show_price_groups' => $showPriceGroups];
+        Configuration::updateValue('ATTRIBUTTIFY_PRODUCT_' . $idProduct, json_encode($payload));
+        $this->jsonResponse(true, 'Configuration saved', ['rows' => $clean, 'show_price_groups' => $showPriceGroups]);
     }
 
     // ─── Load config ─────────────────────────────────────────────────────────
@@ -249,15 +258,33 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
         if ($idProduct <= 0) {
             $this->jsonResponse(false, 'Invalid product id');
         }
+        [$rows, $showPriceGroups] = $this->decodeProductConfig($idProduct);
+        $this->jsonResponse(true, '', ['rows' => $rows, 'show_price_groups' => $showPriceGroups]);
+    }
+
+    // ─── Decode stored product config (handles old flat-array and new object format) ──
+
+    protected function decodeProductConfig(int $idProduct): array
+    {
         $json = Configuration::get('ATTRIBUTTIFY_PRODUCT_' . $idProduct);
-        $rows = [];
-        if (!empty($json)) {
-            $decoded = json_decode($json, true);
-            if (is_array($decoded)) {
-                $rows = $decoded;
-            }
+        if (empty($json)) {
+            return [[], []];
         }
-        $this->jsonResponse(true, '', ['rows' => $rows]);
+        $decoded = json_decode($json, true);
+        if (!is_array($decoded)) {
+            return [[], []];
+        }
+        // New format: {"rows": [...], "show_price_groups": [...]}
+        if (isset($decoded['rows']) && is_array($decoded['rows'])) {
+            $rows            = $decoded['rows'];
+            $showPriceGroups = isset($decoded['show_price_groups']) && is_array($decoded['show_price_groups'])
+                ? array_values(array_map('intval', $decoded['show_price_groups']))
+                : [];
+
+            return [$rows, $showPriceGroups];
+        }
+        // Old format: flat array of rows
+        return [$decoded, []];
     }
 
     // ─── Load product + config (shared by generate & preview) ────────────────
@@ -269,14 +296,7 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
             $this->jsonResponse(false, 'Product not found');
         }
 
-        $json = Configuration::get('ATTRIBUTTIFY_PRODUCT_' . $idProduct);
-        $rows = [];
-        if (!empty($json)) {
-            $decoded = json_decode($json, true);
-            if (is_array($decoded)) {
-                $rows = $decoded;
-            }
-        }
+        [$rows] = $this->decodeProductConfig($idProduct);
         if (empty($rows)) {
             $this->jsonResponse(false, 'No rules defined for this product');
         }
