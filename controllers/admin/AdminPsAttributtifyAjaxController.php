@@ -62,6 +62,8 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
                 case 'loadConfig':     $this->ajaxLoadConfig();      break;
                 case 'generate':       $this->ajaxGenerate();        break;
                 case 'preview':        $this->ajaxPreview();         break;
+                case 'uploadImage':    $this->ajaxUploadImage();     break;
+                case 'deleteImage':    $this->ajaxDeleteImage();     break;
                 default:
                     $this->jsonResponse(false, 'Unknown action');
             }
@@ -228,6 +230,14 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
 
             $wtVal  = isset($row['weight']) ? (float) $row['weight'] : 0.0;
 
+            $cleanImages = [];
+            foreach ((array) ($row['images'] ?? []) as $img) {
+                $fn = preg_replace('/[^a-zA-Z0-9._-]/', '', (string) ($img['filename'] ?? ''));
+                if ($fn !== '' && strpos($fn, '..') === false) {
+                    $cleanImages[] = ['filename' => $fn, 'is_cover' => (bool) ($img['is_cover'] ?? false)];
+                }
+            }
+
             $clean[] = [
                 'condition_groups' => $cleanGroups,
                 'applies_to'       => $cleanAppliesTo,
@@ -237,6 +247,7 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
                 'qty'              => $qtyVal,
                 'reference'        => $refVal,
                 'weight'           => $wtVal,
+                'images'           => $cleanImages,
             ];
         }
 
@@ -912,6 +923,66 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
         }
 
         return $result;
+    }
+
+    // ─── Image upload ────────────────────────────────────────────────────────
+
+    protected function ajaxUploadImage(): void
+    {
+        $idProduct = (int) Tools::getValue('id_product');
+        if ($idProduct <= 0) {
+            $this->jsonResponse(false, 'Invalid product id');
+        }
+
+        if (empty($_FILES['image']['tmp_name'])) {
+            $this->jsonResponse(false, 'No file uploaded');
+        }
+
+        $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $mime         = mime_content_type($_FILES['image']['tmp_name']);
+        if (!in_array($mime, $allowedMimes, true)) {
+            $this->jsonResponse(false, 'Invalid file type');
+        }
+
+        if ($_FILES['image']['size'] > 5 * 1024 * 1024) {
+            $this->jsonResponse(false, 'File too large (max 5 MB)');
+        }
+
+        $extMap = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'];
+        $ext      = $extMap[$mime];
+        $filename = 'attr_' . $idProduct . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+
+        $imgDir = _PS_IMG_DIR_ . 'attributtify';
+        if (!is_dir($imgDir)) {
+            mkdir($imgDir, 0755, true);
+        }
+
+        $dest = $imgDir . DIRECTORY_SEPARATOR . $filename;
+        if (!move_uploaded_file($_FILES['image']['tmp_name'], $dest)) {
+            $this->jsonResponse(false, 'Failed to save file');
+        }
+
+        $url = $this->context->link->getBaseLink() . 'img/attributtify/' . $filename;
+        $this->jsonResponse(true, '', ['filename' => $filename, 'url' => $url]);
+    }
+
+    // ─── Image delete ────────────────────────────────────────────────────────
+
+    protected function ajaxDeleteImage(): void
+    {
+        $filename = (string) Tools::getValue('filename');
+
+        if ($filename === '' || strpos($filename, '..') !== false
+            || strpbrk($filename, '/\\') !== false) {
+            $this->jsonResponse(false, 'Invalid filename');
+        }
+
+        $path = _PS_IMG_DIR_ . 'attributtify' . DIRECTORY_SEPARATOR . $filename;
+        if (file_exists($path)) {
+            unlink($path);
+        }
+
+        $this->jsonResponse(true, '');
     }
 
     /**
