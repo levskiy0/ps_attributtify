@@ -763,19 +763,25 @@
 .att-images-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 6px;
-    min-height: 10px;
+    gap: 5px;
+}
+
+.att-images-loader {
+    font-size: .7rem;
+    color: #9aa0a6;
+    padding: 4px 0;
 }
 
 .att-image-item {
     position: relative;
-    width: 60px;
-    height: 60px;
+    width: 54px;
+    height: 54px;
     border: 2px solid #e0e0e0;
     border-radius: 4px;
     overflow: hidden;
     cursor: pointer;
+    opacity: .55;
+    transition: opacity .1s, border-color .1s, box-shadow .1s;
 }
 
 .att-image-item img {
@@ -785,44 +791,18 @@
     display: block;
 }
 
-.att-image-item.is-cover {
-    border-color: #1976d2;
-    box-shadow: 0 0 0 2px #90caf9;
-}
+.att-image-item:hover        { opacity: .85; }
+.att-image-item.selected     { opacity: 1; border-color: #5f9ea0; }
+.att-image-item.is-cover     { border-color: #1976d2; box-shadow: 0 0 0 2px #90caf9; }
 
-.att-image-delete {
+/* Cover star badge */
+.att-image-item.is-cover::after {
+    content: '★';
     position: absolute;
-    top: 1px;
-    right: 1px;
-    width: 16px;
-    height: 16px;
-    padding: 0;
-    background: rgba(0,0,0,.55);
-    border: none;
-    border-radius: 2px;
-    color: #fff;
+    bottom: 1px;
+    right: 2px;
+    font-size: 9px;
+    color: #1976d2;
     line-height: 1;
-    cursor: pointer;
-    display: none;
+    text-shadow: 0 0 2px #fff;
 }
-
-.att-image-delete .material-icons { font-size: 12px; line-height: 16px; }
-
-.att-image-item:hover .att-image-delete { display: block; }
-
-.att-images-upload-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 3px 8px;
-    font-size: .65rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    color: #3c4043;
-    background: #f1f3f4;
-    border: 1px solid #dadce0;
-    border-radius: 3px;
-    cursor: pointer;
-}
-
-.att-images-upload-btn:hover { background: #e8eaed; }

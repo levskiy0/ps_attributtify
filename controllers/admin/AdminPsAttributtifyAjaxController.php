@@ -60,10 +60,9 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
                 case 'getCustomTypes': $this->ajaxGetCustomTypes();  break;
                 case 'saveConfig':     $this->ajaxSaveConfig();      break;
                 case 'loadConfig':     $this->ajaxLoadConfig();      break;
-                case 'generate':       $this->ajaxGenerate();        break;
-                case 'preview':        $this->ajaxPreview();         break;
-                case 'uploadImage':    $this->ajaxUploadImage();     break;
-                case 'deleteImage':    $this->ajaxDeleteImage();     break;
+                case 'generate':           $this->ajaxGenerate();          break;
+                case 'preview':            $this->ajaxPreview();           break;
+                case 'getProductImages':   $this->ajaxGetProductImages();  break;
                 default:
                     $this->jsonResponse(false, 'Unknown action');
             }
@@ -232,9 +231,9 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
 
             $cleanImages = [];
             foreach ((array) ($row['images'] ?? []) as $img) {
-                $fn = preg_replace('/[^a-zA-Z0-9._-]/', '', (string) ($img['filename'] ?? ''));
-                if ($fn !== '' && strpos($fn, '..') === false) {
-                    $cleanImages[] = ['filename' => $fn, 'is_cover' => (bool) ($img['is_cover'] ?? false)];
+                $idImg = (int) ($img['id_image'] ?? 0);
+                if ($idImg > 0) {
+                    $cleanImages[] = ['id_image' => $idImg, 'is_cover' => (bool) ($img['is_cover'] ?? false)];
                 }
             }
 
@@ -760,6 +759,17 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
 
                 $combo->setAttributes($tuple);
                 StockAvailable::setQuantity($idProduct, (int) $combo->id, (int) $data['qty']);
+
+                foreach ($this->resolveRowImages($tuple, $rows) as $imgId) {
+                    Db::getInstance()->insert(
+                        'product_attribute_image',
+                        ['id_product_attribute' => (int) $combo->id, 'id_image' => (int) $imgId],
+                        false,
+                        true,
+                        Db::INSERT_IGNORE
+                    );
+                }
+
                 $comboIds[] = (int) $combo->id;
                 $created++;
             } catch (\Throwable $e) {
@@ -925,64 +935,104 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
         return $result;
     }
 
-    // ─── Image upload ────────────────────────────────────────────────────────
+    // ─── Return all product images for the image picker ─────────────────────
 
-    protected function ajaxUploadImage(): void
+    protected function ajaxGetProductImages(): void
     {
         $idProduct = (int) Tools::getValue('id_product');
         if ($idProduct <= 0) {
             $this->jsonResponse(false, 'Invalid product id');
         }
 
-        if (empty($_FILES['image']['tmp_name'])) {
-            $this->jsonResponse(false, 'No file uploaded');
+        $idLang    = (int) $this->context->language->id;
+        $rawImages = Image::getImages($idLang, $idProduct);
+        $baseLink  = $this->context->link->getBaseLink();
+
+        $images = [];
+        foreach ((array) $rawImages as $img) {
+            $idImg    = (int) $img['id_image'];
+            $folder   = Image::getImgFolderStatic($idImg);
+            $images[] = [
+                'id_image' => $idImg,
+                'url'      => $baseLink . 'img/p/' . $folder . $idImg . '-small_default.jpg',
+                'cover'    => (bool) $img['cover'],
+                'position' => (int) $img['position'],
+            ];
         }
 
-        $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        $mime         = mime_content_type($_FILES['image']['tmp_name']);
-        if (!in_array($mime, $allowedMimes, true)) {
-            $this->jsonResponse(false, 'Invalid file type');
-        }
-
-        if ($_FILES['image']['size'] > 5 * 1024 * 1024) {
-            $this->jsonResponse(false, 'File too large (max 5 MB)');
-        }
-
-        $extMap = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'];
-        $ext      = $extMap[$mime];
-        $filename = 'attr_' . $idProduct . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
-
-        $imgDir = _PS_IMG_DIR_ . 'attributtify';
-        if (!is_dir($imgDir)) {
-            mkdir($imgDir, 0755, true);
-        }
-
-        $dest = $imgDir . DIRECTORY_SEPARATOR . $filename;
-        if (!move_uploaded_file($_FILES['image']['tmp_name'], $dest)) {
-            $this->jsonResponse(false, 'Failed to save file');
-        }
-
-        $url = $this->context->link->getBaseLink() . 'img/attributtify/' . $filename;
-        $this->jsonResponse(true, '', ['filename' => $filename, 'url' => $url]);
+        $this->jsonResponse(true, '', ['images' => $images]);
     }
 
-    // ─── Image delete ────────────────────────────────────────────────────────
+    // ─── Find images for the best-matching row, return ordered PS image IDs ──
 
-    protected function ajaxDeleteImage(): void
+    protected function resolveRowImages(array $tuple, array $rows): array
     {
-        $filename = (string) Tools::getValue('filename');
+        $matchesPairs = static function (array $tuple, array $pairs): bool {
+            foreach ($pairs as $pair) {
+                $attrs = array_values(array_filter(array_map('intval', $pair['id_attributes'] ?? [])));
+                if (!empty($attrs) && empty(array_intersect($tuple, $attrs))) {
+                    return false;
+                }
+            }
+            return true;
+        };
 
-        if ($filename === '' || strpos($filename, '..') !== false
-            || strpbrk($filename, '/\\') !== false) {
-            $this->jsonResponse(false, 'Invalid filename');
+        $bestSpec   = PHP_INT_MIN;
+        $bestImages = [];
+        $fallback   = [];
+
+        foreach ($rows as $row) {
+            $images = (array) ($row['images'] ?? []);
+            if (empty($images)) {
+                continue;
+            }
+
+            if (!isset($row['condition_groups'])) {
+                $row['condition_groups'] = [['pairs' => $row['pairs'] ?? []]];
+            }
+            $condGroups  = (array) $row['condition_groups'];
+            $isEmptyCond = empty($condGroups)
+                || (count($condGroups) === 1 && empty($condGroups[0]['pairs'] ?? []));
+
+            if ($isEmptyCond) {
+                if (empty($fallback)) {
+                    $fallback = $images;
+                }
+                continue;
+            }
+
+            foreach ($condGroups as $cg) {
+                $pairs = (array) ($cg['pairs'] ?? []);
+                if (!$matchesPairs($tuple, $pairs)) {
+                    continue;
+                }
+                $totalValues = array_sum(array_map(static function ($p) {
+                    return count($p['id_attributes'] ?? []);
+                }, $pairs));
+                $spec = count($pairs) * 10000 - $totalValues;
+                if ($spec > $bestSpec) {
+                    $bestSpec   = $spec;
+                    $bestImages = $images;
+                }
+            }
         }
 
-        $path = _PS_IMG_DIR_ . 'attributtify' . DIRECTORY_SEPARATOR . $filename;
-        if (file_exists($path)) {
-            unlink($path);
+        $source   = ($bestSpec > PHP_INT_MIN) ? $bestImages : $fallback;
+        $coverIds = [];
+        $otherIds = [];
+        foreach ($source as $img) {
+            $idImg = (int) ($img['id_image'] ?? 0);
+            if ($idImg <= 0) {
+                continue;
+            }
+            if (!empty($img['is_cover'])) {
+                $coverIds[] = $idImg;
+            } else {
+                $otherIds[] = $idImg;
+            }
         }
 
-        $this->jsonResponse(true, '');
+        return array_merge($coverIds, $otherIds);
     }
 
     /**

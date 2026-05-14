@@ -371,23 +371,51 @@
             });
         }
 
-        // ── Image thumbnail builder ───────────────────────────────────────────
-        function buildImageThumb(img) {
-            var $wrap = $('<div class="att-image-item">').toggleClass('is-cover', !!img.is_cover);
-            $wrap.data('filename', img.filename);
-            $('<img>').attr('src', attributtifyImgBaseUrl + img.filename).appendTo($wrap);
-            $('<button type="button" class="att-image-delete" title="Delete image">' +
-              '<i class="material-icons">close</i></button>').appendTo($wrap);
-            return $wrap;
+        // ── Build a product image picker item ────────────────────────────────
+        function buildProductImageItem(img, selected, isCover) {
+            var $item = $('<div class="att-image-item">')
+                .attr('data-id-image', img.id_image)
+                .toggleClass('selected', !!selected)
+                .toggleClass('is-cover', !!isCover);
+            $('<img>').attr('src', img.url).appendTo($item);
+            return $item;
         }
 
-        // ── Collect images from a grid ────────────────────────────────────────
+        // ── Collect selected images from picker grid ──────────────────────────
         function collectImages($grid) {
+            var $panel = $grid.closest('.att-images-panel');
+            if ($panel.length && !$panel.data('loaded')) {
+                return ($panel.data('initial-images') || []).slice();
+            }
             var imgs = [];
-            $grid.find('.att-image-item').each(function () {
-                imgs.push({ filename: $(this).data('filename'), is_cover: $(this).hasClass('is-cover') });
+            $grid.find('.att-image-item.selected').each(function () {
+                imgs.push({
+                    id_image: parseInt($(this).attr('data-id-image'), 10),
+                    is_cover: $(this).hasClass('is-cover')
+                });
             });
             return imgs;
+        }
+
+        // ── Load product images into panel (lazy, called on first tab open) ───
+        function loadImagesPanel($panel) {
+            var initial   = $panel.data('initial-images') || [];
+            var selMap    = {};
+            var coverMap  = {};
+            initial.forEach(function (img) {
+                selMap[img.id_image]   = true;
+                if (img.is_cover) { coverMap[img.id_image] = true; }
+            });
+
+            ajax('getProductImages', { id_product: productId }).done(function (r) {
+                var $grid = $panel.find('.att-images-grid').empty();
+                (r.images || []).forEach(function (img) {
+                    $grid.append(buildProductImageItem(img, !!selMap[img.id_image], !!coverMap[img.id_image]));
+                });
+                $panel.find('.att-images-loader').hide();
+                $panel.data('loaded', true);
+                syncTabBadges($panel.closest('.att-rule-cell'));
+            });
         }
 
         // ── Build a single condition pair (Group → Values) ────────────────────
@@ -450,7 +478,10 @@
         function syncTabBadges($ruleCell) {
             var appliesCount  = $ruleCell.find('.att-applies-chain  > .att-pair').length;
             var excludesCount = $ruleCell.find('.att-excludes-chain > .att-pair').length;
-            var imagesCount   = $ruleCell.find('.att-images-grid > .att-image-item').length;
+            var $imgPanel     = $ruleCell.find('.att-images-panel');
+            var imagesCount   = $imgPanel.data('loaded')
+                ? $imgPanel.find('.att-images-grid > .att-image-item.selected').length
+                : ($imgPanel.data('initial-images') || []).length;
             $ruleCell.find('.att-tab[data-tab="applies"]').toggleClass('has-content',  appliesCount  > 0);
             $ruleCell.find('.att-tab[data-tab="excludes"]').toggleClass('has-content', excludesCount > 0);
             $ruleCell.find('.att-col-tab[data-col-tab="images"]').toggleClass('has-content', imagesCount > 0);
@@ -520,15 +551,14 @@
             $excludesPanel.append($excludesChain);
             $leftCol.append($excludesPanel);
 
-            // Images panel
-            var rowUuid = data.uuid || generateUUID();
+            // Images panel (lazy-loaded on first tab open)
+            var rowUuid      = data.uuid || generateUUID();
             var $imagesPanel = $('<div class="att-col-panel att-images-panel" data-col-panel="images">');
+            $imagesPanel.data('initial-images', data.images || []);
+            $imagesPanel.data('loaded', false);
             var $imagesGrid  = $('<div class="att-images-grid">');
-            (data.images || []).forEach(function (img) { $imagesGrid.append(buildImageThumb(img)); });
-            var $fileInput = $('<input type="file" accept="image/*" multiple style="display:none">').attr('data-row-uuid', rowUuid);
-            var $uploadBtn = $('<button type="button" class="att-images-upload-btn">')
-                .html('<i class="material-icons" style="font-size:13px;vertical-align:middle">add_photo_alternate</i> Add image');
-            $imagesPanel.append($imagesGrid, $fileInput, $uploadBtn);
+            var $imagesLoader = $('<div class="att-images-loader">Loading…</div>');
+            $imagesPanel.append($imagesGrid, $imagesLoader);
             $leftCol.append($imagesPanel);
 
             // Right column — Applies to (hidden for fixed rows)
@@ -724,59 +754,34 @@
             $tab.addClass('active');
             $leftCol.find('.att-col-panel').removeClass('active');
             $leftCol.find('.att-col-panel[data-col-panel="' + target + '"]').addClass('active');
+            // Lazy-load product images on first open
+            if (target === 'images') {
+                var $panel = $leftCol.find('.att-images-panel');
+                if (!$panel.data('loaded')) { loadImagesPanel($panel); }
+            }
         });
 
-        // ── Images: upload button → trigger file input ────────────────────────
-        $rows.on('click', '.att-images-upload-btn', function () {
-            $(this).closest('.att-images-panel').find('input[type="file"]').click();
-        });
-
-        // ── Images: files selected → upload each via AJAX ────────────────────
-        $rows.on('change', 'input[type="file"]', function () {
-            var $input = $(this);
-            var $panel = $input.closest('.att-images-panel');
-            var $grid  = $panel.find('.att-images-grid');
-            var files  = Array.prototype.slice.call(this.files);
-            if (!files.length) { return; }
-            files.forEach(function (file) {
-                var fd = new FormData();
-                fd.append('action', 'uploadImage');
-                fd.append('id_product', productId);
-                fd.append('image', file);
-                $.ajax({ url: attributtifyAjaxUrl, type: 'POST', data: fd, processData: false, contentType: false })
-                    .done(function (r) {
-                        if (r && r.success) {
-                            $grid.append(buildImageThumb({ filename: r.filename, is_cover: false }));
-                            syncTabBadges($input.closest('.att-rule-cell'));
-                            markDirty();
-                        }
-                    });
-            });
-            $input.val('');
-        });
-
-        // ── Images: double-click → set as cover ──────────────────────────────
-        $rows.on('dblclick', '.att-image-item', function () {
+        // ── Images: click → toggle selection ─────────────────────────────────
+        $rows.on('click', '.att-images-panel .att-image-item', function () {
             var $item = $(this);
-            var $grid = $item.closest('.att-images-grid');
-            $grid.find('.att-image-item').removeClass('is-cover');
-            $item.addClass('is-cover');
+            if ($item.hasClass('selected')) {
+                $item.removeClass('selected is-cover');
+            } else {
+                $item.addClass('selected');
+            }
+            syncTabBadges($item.closest('.att-rule-cell'));
             markDirty();
         });
 
-        // ── Images: delete button ─────────────────────────────────────────────
-        $rows.on('click', '.att-image-delete', function (e) {
-            e.stopPropagation();
-            var $item     = $(this).closest('.att-image-item');
-            var $ruleCell = $item.closest('.att-rule-cell');
-            var filename  = $item.data('filename');
-            ajax('deleteImage', { filename: filename }).done(function (r) {
-                if (r && r.success) {
-                    $item.remove();
-                    syncTabBadges($ruleCell);
-                    markDirty();
-                }
-            });
+        // ── Images: double-click → set as cover ──────────────────────────────
+        $rows.on('dblclick', '.att-images-panel .att-image-item', function () {
+            var $item = $(this);
+            var $grid = $item.closest('.att-images-grid');
+            $item.addClass('selected');
+            $grid.find('.att-image-item').removeClass('is-cover');
+            $item.addClass('is-cover');
+            syncTabBadges($item.closest('.att-rule-cell'));
+            markDirty();
         });
 
         // ── Drag-and-drop row sorting ─────────────────────────────────────────

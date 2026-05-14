@@ -41,11 +41,6 @@ class Ps_Attributtify extends Module
 
     public function install(): bool
     {
-        $imgDir = _PS_IMG_DIR_ . 'attributtify';
-        if (!is_dir($imgDir)) {
-            mkdir($imgDir, 0755, true);
-        }
-
         return parent::install()
             && $this->registerHook('displayBackOfficeHeader')
             && $this->registerHook('actionProductGetAttributesGroupsAfter')
@@ -179,8 +174,7 @@ class Ps_Attributtify extends Module
         $this->context->controller->addJS($this->_path . 'views/js/attributtify.js?v=' . $this->version);
 
         Media::addJsDef([
-            'attributtifyAjaxUrl'    => $this->context->link->getAdminLink('AdminPsAttributtifyAjax'),
-            'attributtifyImgBaseUrl' => $this->context->link->getBaseLink() . 'img/attributtify/',
+            'attributtifyAjaxUrl' => $this->context->link->getAdminLink('AdminPsAttributtifyAjax'),
         ]);
     }
 
