@@ -963,7 +963,7 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
         $this->jsonResponse(true, '', ['images' => $images]);
     }
 
-    // ─── Find images for the best-matching row, return ordered PS image IDs ──
+    // ─── Find images for a tuple: fixed rule = base, impact rules = additive ──
 
     protected function resolveRowImages(array $tuple, array $rows): array
     {
@@ -977,15 +977,30 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
             return true;
         };
 
-        $bestSpec   = PHP_INT_MIN;
-        $bestImages = [];
-        $fallback   = [];
+        $matchesExcludes = static function (array $tuple, array $excludes) use ($matchesPairs): bool {
+            foreach ($excludes as $ex) {
+                $attrs = array_values(array_filter(array_map('intval', $ex['id_attributes'] ?? [])));
+                if (!empty($attrs) && !empty(array_intersect($tuple, $attrs))) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        $bestFixedSpec    = PHP_INT_MIN;
+        $fixedImages      = [];
+        $hasFixed         = false;
+        $impactImages     = [];   // merged from all matching impact rows
+        $unconditionalImg = [];   // fallback for fixed; additive for impact
 
         foreach ($rows as $row) {
-            $images = (array) ($row['images'] ?? []);
+            $images    = (array) ($row['images'] ?? []);
             if (empty($images)) {
                 continue;
             }
+
+            $priceType = $row['price_type'] ?? 'impact';
+            $isFixed   = ($priceType === 'fixed');
 
             if (!isset($row['condition_groups'])) {
                 $row['condition_groups'] = [['pairs' => $row['pairs'] ?? []]];
@@ -993,14 +1008,32 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
             $condGroups  = (array) $row['condition_groups'];
             $isEmptyCond = empty($condGroups)
                 || (count($condGroups) === 1 && empty($condGroups[0]['pairs'] ?? []));
+            $excludes    = (array) ($row['excludes'] ?? []);
+
+            if ($matchesExcludes($tuple, $excludes)) {
+                continue;
+            }
 
             if ($isEmptyCond) {
-                if (empty($fallback)) {
-                    $fallback = $images;
+                if ($isFixed && !$hasFixed) {
+                    // Unconditional fixed — lowest-priority base fallback
+                    if (empty($unconditionalImg)) {
+                        $unconditionalImg = $images;
+                    }
+                } else {
+                    // Unconditional impact — always added
+                    foreach ($images as $img) {
+                        $id = (int) ($img['id_image'] ?? 0);
+                        if ($id > 0) {
+                            $impactImages[$id] = $img;
+                        }
+                    }
                 }
                 continue;
             }
 
+            // Conditional row — find best specificity across OR-groups
+            $bestSpec = PHP_INT_MIN;
             foreach ($condGroups as $cg) {
                 $pairs = (array) ($cg['pairs'] ?? []);
                 if (!$matchesPairs($tuple, $pairs)) {
@@ -1009,27 +1042,58 @@ class AdminPsAttributtifyAjaxController extends ModuleAdminController
                 $totalValues = array_sum(array_map(static function ($p) {
                     return count($p['id_attributes'] ?? []);
                 }, $pairs));
-                $spec = count($pairs) * 10000 - $totalValues;
-                if ($spec > $bestSpec) {
-                    $bestSpec   = $spec;
-                    $bestImages = $images;
+                $s = count($pairs) * 10000 - $totalValues;
+                if ($s > $bestSpec) {
+                    $bestSpec = $s;
+                }
+            }
+            if ($bestSpec === PHP_INT_MIN) {
+                continue; // no condition group matched
+            }
+
+            if ($isFixed) {
+                if ($bestSpec > $bestFixedSpec) {
+                    $bestFixedSpec = $bestSpec;
+                    $fixedImages   = $images;
+                    $hasFixed      = true;
+                }
+            } else {
+                foreach ($images as $img) {
+                    $id = (int) ($img['id_image'] ?? 0);
+                    if ($id > 0) {
+                        $impactImages[$id] = $img;
+                    }
                 }
             }
         }
 
-        $source   = ($bestSpec > PHP_INT_MIN) ? $bestImages : $fallback;
+        // Base = best fixed, or unconditional fixed fallback if none matched
+        $baseImages = $hasFixed ? $fixedImages : $unconditionalImg;
+
+        // Merge: cover from base first, then other base, then impact additions
         $coverIds = [];
         $otherIds = [];
-        foreach ($source as $img) {
-            $idImg = (int) ($img['id_image'] ?? 0);
-            if ($idImg <= 0) {
+        $seen     = [];
+
+        foreach ($baseImages as $img) {
+            $id = (int) ($img['id_image'] ?? 0);
+            if ($id <= 0 || isset($seen[$id])) {
                 continue;
             }
+            $seen[$id] = true;
             if (!empty($img['is_cover'])) {
-                $coverIds[] = $idImg;
+                $coverIds[] = $id;
             } else {
-                $otherIds[] = $idImg;
+                $otherIds[] = $id;
             }
+        }
+
+        foreach ($impactImages as $id => $img) {
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            $otherIds[] = $id;
         }
 
         return array_merge($coverIds, $otherIds);
